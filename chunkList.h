@@ -9,4 +9,4 @@ typedef struct cE{
 	
 
 chunkEle* initChunkEle(unsigned int id, char hash[20]);
-
+void printChunkList(linkedList clist);

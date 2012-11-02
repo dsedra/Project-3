@@ -13,3 +13,20 @@ chunkEle* initChunkEle(unsigned int id, char hash[20]){
 	ele->responseList.length = 0;
 	return ele;
 }
+
+void printChunkList(linkedList clist){
+	node* itr = clist.headp;
+	int counter = 0;
+	
+	do{
+		chunkEle* itrChunk = (chunkEle*)(itr->data);
+		printf("id: %u, %s\n",itrChunk->chunkId,itrChunk->chunkHash);
+		counter++;
+		itr = itr->prevp;
+	}while(itr != clist.headp);
+	
+	if(counter != clist.length)
+		printf("Length incorrect!\n");
+		
+	return;
+}

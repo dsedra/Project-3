@@ -13,6 +13,9 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/ip.h>
+#include <unistd.h>
+#include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,6 +28,10 @@
 #include "chunkList.h"
 
 linkedList chunkList;
+linkedList peerList;
+
+/* global udp socket */
+int sock;
 
 void peer_run(bt_config_t *config);
 int main(int argc, char **argv) {
@@ -76,7 +83,10 @@ void process_get(char *chunkfile, char *outputfile) {
 	char locBuf[100];
 	unsigned int id;
 	char hash[20];
+	unsigned int i,j;
 	
+	
+	/* parse chunkfile*/
 	if((fp = fopen(chunkfile, "r")) == NULL){
 		fprintf(stderr,"Error opening %s",chunkfile);
 		exit(1);
@@ -95,7 +105,22 @@ void process_get(char *chunkfile, char *outputfile) {
 		addList(newNode, &chunkList);
 	}
 	
-  printf("PROCESS GET SKELETON CODE CALLED.  Fill me in!  (%s, %s)\n", 
+	
+	
+	
+	printChunkList(chunkList);
+	
+	/* needed if too many chunks for one packet */
+	for(i = 0; i < chunkList.length; i += MAXCHUNKS){
+		void* whohasp = whohasCons(&chunkList, i);
+		unsigned int bufSize = ((packetHead *)whohasp)->packLen;
+		
+		for(j = 0; j < peerList.length; j++){
+			//spiffy_sendto(sock, whohasp, packLen, 0, (struct sockaddr *) &from, &fromlen);
+		}
+	}
+	
+  	printf("PROCESS GET SKELETON CODE CALLED.  Fill me in!  (%s, %s)\n", 
 	chunkfile, outputfile);
 }
 
@@ -114,7 +139,6 @@ void handle_user_input(char *line, void *cbdata) {
 
 
 void peer_run(bt_config_t *config) {
-  int sock;
   struct sockaddr_in myaddr;
   fd_set readfds;
   struct user_iobuf *userbuf;
@@ -154,11 +178,53 @@ void peer_run(bt_config_t *config) {
       }
       
       if (FD_ISSET(STDIN_FILENO, &readfds)) {
+		printf("going to process_user_input\n");
 		process_user_input(STDIN_FILENO, userbuf, handle_user_input,
 			   "Currently unused");
       }
     }
   }
+}
+
+void parsePeerFile(char* peerFile){
+	FILE* fp;
+	char locBuf[100];	
+	unsigned int id;
+	char hostname[60];
+	unsigned int port;
+
+	if((fp = fopen(peerFile, "r")) == NULL){
+		fprintf(stderr,"Error opening %s",peerFile);
+		exit(1);
+	}
+	
+	while(fgets(locBuf,sizeof(locBuf),fp)){
+		/* read each line in peerfile */
+		if(sscanf(locBuf,"%u %s %u",&id,hostname,&port) < 2){
+			fprintf(stderr,"Malformed chunkfile %s",peerFile);
+			exit(1);
+		}
+		
+		/* add new peer entry in list */
+		peerEle* ele = malloc(sizeof(peerEle));
+		ele->id = id;
+		
+		
+		struct hostent *h;
+		if((h = gethostbyname(hostname))==NULL) {
+			printf("error resolving host\n");
+			break;
+		}
+		memset(&ele->cli_addr, '\0', sizeof(ele->cli_addr));
+	   	ele->cli_addr.sin_family = AF_INET;
+		ele->cli_addr.sin_addr.s_addr = *(in_addr_t *)h->h_addr;
+  		ele->cli_addr.sin_port = htons(port);
+	
+		node* newNode = initNode(ele);
+		addList(newNode, &peerList);
+	}
+	
+	return;
 }
 
 

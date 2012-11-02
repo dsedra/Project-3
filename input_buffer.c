@@ -51,4 +51,5 @@ void process_user_input(int fd, struct user_iobuf *userbuf,
   userbuf->cur -= (ret - userbuf->buf + 1);
  }
 
+return;
 }
