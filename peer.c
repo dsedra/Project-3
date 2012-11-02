@@ -21,9 +21,12 @@
 #include "bt_parse.h"
 #include "input_buffer.h"
 #include "linkedList.h"
+#include "packet.h"
+#include "chunkList.h"
+
+linkedList chunkList;
 
 void peer_run(bt_config_t *config);
-
 int main(int argc, char **argv) {
   bt_config_t config;
 
@@ -59,6 +62,8 @@ void process_inbound_udp(int sock) {
   fromlen = sizeof(from);
   spiffy_recvfrom(sock, buf, BUFLEN, 0, (struct sockaddr *) &from, &fromlen);
 
+	
+
   printf("PROCESS_INBOUND_UDP SKELETON -- replace!\n"
 	 "Incoming message from %s:%d\n%s\n\n", 
 	 inet_ntoa(from.sin_addr),
@@ -67,6 +72,29 @@ void process_inbound_udp(int sock) {
 }
 
 void process_get(char *chunkfile, char *outputfile) {
+	FILE* fp;
+	char locBuf[100];
+	unsigned int id;
+	char hash[20];
+	
+	if((fp = fopen(chunkfile, "r")) == NULL){
+		fprintf(stderr,"Error opening %s",chunkfile);
+		exit(1);
+	}
+	
+	while(fgets(locBuf,sizeof(locBuf),fp)){
+		/* read each line in chunkfile */
+		if(sscanf(locBuf,"%d %20c",&id,hash) < 2){
+			fprintf(stderr,"Malformed chunkfile %s",chunkfile);
+			exit(1);
+		}
+		
+		/* add new chunk entry in list */
+		chunkEle* ele = initChunkEle(id,hash);
+		node* newNode = initNode(ele);
+		addList(newNode, &chunkList);
+	}
+	
   printf("PROCESS GET SKELETON CODE CALLED.  Fill me in!  (%s, %s)\n", 
 	chunkfile, outputfile);
 }
@@ -132,3 +160,5 @@ void peer_run(bt_config_t *config) {
     }
   }
 }
+
+

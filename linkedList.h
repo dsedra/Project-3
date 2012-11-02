@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef linkedList_h
+#define linkedList_h
 typedef struct n{
 	struct n* nextp;
 	struct n* prevp;
@@ -15,3 +17,5 @@ typedef struct ll{
 
 void addList(node* toAdd, linkedList* listp);
 void remList(node* toRem, linkedList* listp);
+node* initNode(void* data);
+#endif

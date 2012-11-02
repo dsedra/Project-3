@@ -19,6 +19,7 @@ void addList(node* toAdd, linkedList* listp){
 	}
 	
 	listp->headp = toAdd;
+	listp->length++;
 	return;
 }
 
@@ -39,10 +40,20 @@ void remList(node* toRem, linkedList* listp){
 				listp->headp = toRem->nextp;
 		
 			free(toRem->data);
+			listp->length--;
 		}
 		
 		itr = itr->nextp;
 	}while(itr != listp->headp);
 	
 	return;
+}
+
+node* initNode(void* data){
+	node* newNode = malloc(sizeof(node));
+	newNode->data = data;
+	newNode->nextp = NULL;
+	newNode->prevp = NULL;
+	
+	return newNode;
 }
