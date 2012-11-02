@@ -3,7 +3,7 @@ CC 		= gcc
 CFLAGS		= -g -Wall -DDEBUG
 LDFLAGS		= -lm
 TESTDEFS	= -DTESTING			# comment this out to disable debugging code
-OBJS		= peer.o bt_parse.o spiffy.o debug.o input_buffer.o chunk.o sha.o
+OBJS		= peer.o bt_parse.o spiffy.o debug.o input_buffer.o chunk.o sha.o linkedList.o
 MK_CHUNK_OBJS   = make_chunks.o chunk.o sha.o
 
 BINS            = peer make-chunks
@@ -43,3 +43,6 @@ test_debug.o: debug.c debug-text.h
 	${CC} debug.c ${INCLUDES} ${CFLAGS} -c -D_TEST_DEBUG_ -o $@
 
 test_input_buffer:  test_input_buffer.o input_buffer.o
+
+linkedList.o: linkedList.h linkedList.c
+	gcc -c linkedList.c

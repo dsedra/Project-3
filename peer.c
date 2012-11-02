@@ -20,6 +20,7 @@
 #include "spiffy.h"
 #include "bt_parse.h"
 #include "input_buffer.h"
+#include "linkedList.h"
 
 void peer_run(bt_config_t *config);
 
@@ -121,11 +122,11 @@ void peer_run(bt_config_t *config) {
     
     if (nfds > 0) {
       if (FD_ISSET(sock, &readfds)) {
-	process_inbound_udp(sock);
+		process_inbound_udp(sock);
       }
       
       if (FD_ISSET(STDIN_FILENO, &readfds)) {
-	process_user_input(STDIN_FILENO, userbuf, handle_user_input,
+		process_user_input(STDIN_FILENO, userbuf, handle_user_input,
 			   "Currently unused");
       }
     }
