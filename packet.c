@@ -10,12 +10,10 @@
 void* whohasCons(linkedList* listp, unsigned int start){
 	if((listp == NULL) || (listp->headp == NULL))
 		return NULL;
-	
 	void* packet = malloc(headerSize + numChunks + 20*listp->length);
 	void* i = packet + headerSize + numChunks; /* beginning of chunks */
 	
 	packetHead* pHp = (packetHead*) packet;
-	
 	pHp->magicNum = MAGICNUM;
 	pHp->version = VERSION;
 	pHp->type = WHOHAS;
@@ -40,4 +38,15 @@ void* whohasCons(linkedList* listp, unsigned int start){
 	}while(itr != listp->headp);
 	
 	return packet;
+}
+
+void* ihaveCons(char* buf, linkedList* chunkList){
+	
+	char curr = buf;
+	curr += 20;
+	
+	
+	
+	
+	
 }

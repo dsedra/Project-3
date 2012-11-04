@@ -32,8 +32,10 @@ linkedList peerList;
 
 /* global udp socket */
 int sock;
-
+int myId;
 void peer_run(bt_config_t *config);
+void parsePeerFile(char* peerFile);
+
 int main(int argc, char **argv) {
   bt_config_t config;
 
@@ -54,7 +56,6 @@ int main(int argc, char **argv) {
     bt_dump_config(&config);
   }
 #endif
-  
   peer_run(&config);
   return 0;
 }
@@ -68,9 +69,19 @@ void process_inbound_udp(int sock) {
 
   fromlen = sizeof(from);
   spiffy_recvfrom(sock, buf, BUFLEN, 0, (struct sockaddr *) &from, &fromlen);
-
+  packetHead* pHead = (packetHead* )buf;
+  
+  switch(pHead->type){
+	case WHOHAS:
+		printf("\nRecieve WHOHAS request\n");
+		char hashValue[20];
+		sscanf((buf+20), "%20c",hashValue);
+		printf("chunk %s\n", hashValue);
+		sscanf((buf+40), "%20c",hashValue);
+		printf("chunk %s\n", hashValue);
+		break;
 	
-
+	}
   printf("PROCESS_INBOUND_UDP SKELETON -- replace!\n"
 	 "Incoming message from %s:%d\n%s\n\n", 
 	 inet_ntoa(from.sin_addr),
@@ -104,19 +115,21 @@ void process_get(char *chunkfile, char *outputfile) {
 		node* newNode = initNode(ele);
 		addList(newNode, &chunkList);
 	}
-	
-	
-	
-	
 	printChunkList(chunkList);
 	
 	/* needed if too many chunks for one packet */
 	for(i = 0; i < chunkList.length; i += MAXCHUNKS){
 		void* whohasp = whohasCons(&chunkList, i);
 		unsigned int bufSize = ((packetHead *)whohasp)->packLen;
-		
+		node* itr = peerList.headp;
+			
 		for(j = 0; j < peerList.length; j++){
-			//spiffy_sendto(sock, whohasp, packLen, 0, (struct sockaddr *) &from, &fromlen);
+	      peerEle* thisPeer = (peerEle*)itr->data;
+	 		if( thisPeer->id != myId ){
+				printf("Send packet to peer %d @  %s:%d\n", thisPeer->id, inet_ntoa(thisPeer->cli_addr.sin_addr) ,ntohs(thisPeer->cli_addr.sin_port));
+		  		spiffy_sendto(sock, whohasp, bufSize, 0, (struct sockaddr *) &thisPeer->cli_addr, sizeof(thisPeer->cli_addr));
+	  		}
+			itr = itr->nextp;
 		}
 	}
 	
@@ -142,7 +155,11 @@ void peer_run(bt_config_t *config) {
   struct sockaddr_in myaddr;
   fd_set readfds;
   struct user_iobuf *userbuf;
-  
+  // get my id from config
+  myId = config->identity;
+  // parse peer list file
+  parsePeerFile(config->peer_list_file);
+
   if ((userbuf = create_userbuf()) == NULL) {
     perror("peer_run could not allocate userbuf");
     exit(-1);
@@ -164,7 +181,7 @@ void peer_run(bt_config_t *config) {
   }
   
   spiffy_init(config->identity, (struct sockaddr *)&myaddr, sizeof(myaddr));
-  
+  printf("I am peer %d, %s:%d\n",myId, inet_ntoa(myaddr.sin_addr) ,ntohs(myaddr.sin_port));
   while (1) {
     int nfds;
     FD_SET(STDIN_FILENO, &readfds);
@@ -174,6 +191,7 @@ void peer_run(bt_config_t *config) {
     
     if (nfds > 0) {
       if (FD_ISSET(sock, &readfds)) {
+		printf("Receive something from UDP port");
 		process_inbound_udp(sock);
       }
       
@@ -202,14 +220,12 @@ void parsePeerFile(char* peerFile){
 		/* read each line in peerfile */
 		if(sscanf(locBuf,"%u %s %u",&id,hostname,&port) < 2){
 			fprintf(stderr,"Malformed chunkfile %s",peerFile);
-			exit(1);
+			continue;
 		}
 		
 		/* add new peer entry in list */
 		peerEle* ele = malloc(sizeof(peerEle));
 		ele->id = id;
-		
-		
 		struct hostent *h;
 		if((h = gethostbyname(hostname))==NULL) {
 			printf("error resolving host\n");
