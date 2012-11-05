@@ -4,7 +4,7 @@ typedef struct cE{
 	unsigned int chunkId;
 	char chunkHash[20];
 	linkedList packetList;
-	linkedList responseList;
+	peerEle* fromThisPeer;
 }chunkEle;
 	
 

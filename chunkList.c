@@ -15,8 +15,6 @@ chunkEle* initChunkEle(unsigned int id, char hash[20]){
 	memcpy(ele->chunkHash,hash,20);
 	ele->packetList.headp = NULL;
 	ele->packetList.length = 0;
-	ele->responseList.headp = NULL;
-	ele->responseList.length = 0;
 	return ele;
 }
 
@@ -29,7 +27,9 @@ void printChunkList(linkedList clist){
 	do{
 		chunkEle* itrChunk = (chunkEle*)(itr->data);
 		printf("id: %u, %s\n",itrChunk->chunkId,itrChunk->chunkHash);
-		printPeerList(itrChunk->responseList);
+		if(itrChunk->fromThisPeer != NULL){
+			printf("peer id %d, %s:%d\n", itrChunk->fromThisPeer->id, itrChunk->fromThisPeer->host, itrChunk->fromThisPeer->port);
+		}
 		counter++;
 		itr = itr->prevp;
 	}while(itr != clist.headp);
@@ -84,7 +84,10 @@ peerEle* resolvePeer( struct sockaddr_in from, linkedList pList ){
 	node* itr = pList.headp;
 	do{
 		peerEle* thisPeer = (peerEle* ) itr->data;
-		if( strcmp(thisPeer->host, (char*)inet_ntoa(from.sin_addr))== 0 && thisPeer->port == ntohs(from.sin_port)){	
+		//printf("**%s:%d**\n",thisPeer->host, thisPeer->port);
+		//printf("TARGET %s:%d\n",inet_ntoa(from.sin_addr), ntohs(from.sin_port));
+		//strcmp(thisPeer->host, inet_ntoa(from.sin_addr))== 0 &&
+		if( thisPeer->port == ntohs(from.sin_port)){	
 			return thisPeer;
 		}
 		itr = itr->nextp;
@@ -93,15 +96,15 @@ peerEle* resolvePeer( struct sockaddr_in from, linkedList pList ){
 }
 
 void AddResponses(peerEle* thisPeer, char* buf, linkedList* chunkList){
-	char* curr = buf;
-	unsigned char* numOfchunks = (unsigned char*)(curr+headerSize);
+	unsigned char* curr = buf;
+	unsigned char numOfchunks = *(curr+headerSize);
+	curr = curr + headerSize + numChunks; // beginning of the chunks
 	int i;
 	char hash[20];
-	for(i = 0; i < *numOfchunks ; i++){
+	for(i = 0; i < numOfchunks ; i++){
 		sscanf( curr, "%20c", hash );
 		chunkEle* thisChunk = lookupChunkHash(hash, chunkList);
-		node* newNode = initNode(thisPeer);
-		addList( newNode, &(thisChunk->responseList));
+		thisChunk->fromThisPeer = thisPeer;
 		curr += sizeofHash;
 	}
 }

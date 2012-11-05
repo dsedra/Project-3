@@ -52,7 +52,7 @@ void* ihaveCons(char* buf, linkedList* chunkList){
 	void* packetPtr = packet + headerSize + numChunks;// beginning of chunks
 	
 	char* curr = buf;
-	unsigned char* numOfchunks = (unsigned char*)(curr+headerSize);
+	unsigned char* numOfchunks = (unsigned char*)(curr+headerSize);	
 	printf("the num of chunks is %u\n", *numOfchunks);
 	curr = curr+headerSize+numChunks;
 	int i;
@@ -68,6 +68,9 @@ void* ihaveCons(char* buf, linkedList* chunkList){
 			counter++;
 		}
 		curr += sizeofHash;
+	}
+	if(counter == 0){
+		return NULL;
 	}
 	*(unsigned char*)(packet+headerSize) = (unsigned char)counter;
 	return packet;

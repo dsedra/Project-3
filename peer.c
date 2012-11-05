@@ -67,7 +67,7 @@ void process_inbound_udp(int sock) {
   #define BUFLEN 1500
   struct sockaddr_in from;
   socklen_t fromlen;
-  char buf[BUFLEN];
+  unsigned char buf[BUFLEN];
 
   fromlen = sizeof(from);
   spiffy_recvfrom(sock, buf, BUFLEN, 0, (struct sockaddr *) &from, &fromlen);
@@ -77,8 +77,10 @@ void process_inbound_udp(int sock) {
 	case WHOHAS:
 		printf("Recieve WHOHAS request\n");
 		void* ihavep = ihaveCons(buf, &haschunkList);
+		if( ihavep!= NULL){
 		unsigned int bufSize = ((packetHead *)ihavep)->packLen;
 		spiffy_sendto(sock, ihavep, bufSize, 0, (struct sockaddr *) &from, fromlen);
+		}
 		break;
 	case IHAVE:
 		printf("Receieve IHAVE request");
@@ -88,6 +90,11 @@ void process_inbound_udp(int sock) {
 		printf("chunk hash: %s\n", tmp);
 		
 		peerEle* thisPeer = resolvePeer(from, peerList);
+		
+		if( thisPeer == NULL ){
+			printf("RESOLVE FAILED\n");
+		}
+		
 		AddResponses(thisPeer, buf, &chunkList);
 		printChunkList(chunkList);
 	}
