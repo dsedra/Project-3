@@ -6,7 +6,6 @@
 #include <string.h>
 
 
-
 void* whohasCons(linkedList* listp, unsigned int start){
 	if((listp == NULL) || (listp->headp == NULL))
 		return NULL;
@@ -41,12 +40,37 @@ void* whohasCons(linkedList* listp, unsigned int start){
 }
 
 void* ihaveCons(char* buf, linkedList* chunkList){
+	void* packet = malloc(1500);
+	packetHead* pHp = (packetHead*) packet;
+	pHp->magicNum = MAGICNUM;
+	pHp->version = VERSION;
+	pHp->type = IHAVE;
+	pHp->headerLen = headerSize;
+	pHp->packLen = headerSize + numChunks;// this is temporary
+	pHp->seqNum = 0;
+	pHp->ackNum = 0;
+	void* packetPtr = packet + headerSize + numChunks;// beginning of chunks
 	
-	char curr = buf;
-	curr += 20;
-	
-	
-	
-	
-	
+	char* curr = buf;
+	unsigned char* numOfchunks = (unsigned char*)(curr+headerSize);
+	printf("the num of chunks is %u\n", *numOfchunks);
+	curr = curr+headerSize+numChunks;
+	int i;
+	int counter = 0;
+	char hash[20];
+	for(i = 0 ; i < *numOfchunks ; i ++){
+		sscanf( curr, "%20c", hash );
+		chunkEle* thisChunk = lookupChunkHash(hash, chunkList);
+		if( thisChunk ){
+			memcpy(packetPtr, hash, sizeofHash);
+			pHp->packLen += sizeofHash;
+			packetPtr += sizeofHash;
+			counter++;
+		}
+		curr += sizeofHash;
+	}
+	*(unsigned char*)(packet+headerSize) = (unsigned char)counter;
+	return packet;
 }
+
+

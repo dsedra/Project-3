@@ -31,6 +31,8 @@ typedef struct ph packetHead;
 
 typedef struct ps{
 	unsigned int id;
+	char host[60];
+	int port;
 	struct sockaddr_in cli_addr;
 }peerEle;
 

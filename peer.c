@@ -29,12 +29,14 @@
 
 linkedList chunkList;
 linkedList peerList;
+linkedList haschunkList;
 
 /* global udp socket */
 int sock;
 int myId;
 void peer_run(bt_config_t *config);
 void parsePeerFile(char* peerFile);
+void parseChunkFile(char* chunkfile, linkedList* list);
 
 int main(int argc, char **argv) {
   bt_config_t config;
@@ -73,14 +75,21 @@ void process_inbound_udp(int sock) {
   
   switch(pHead->type){
 	case WHOHAS:
-		printf("\nRecieve WHOHAS request\n");
-		char hashValue[20];
-		sscanf((buf+20), "%20c",hashValue);
-		printf("chunk %s\n", hashValue);
-		sscanf((buf+40), "%20c",hashValue);
-		printf("chunk %s\n", hashValue);
+		printf("Recieve WHOHAS request\n");
+		void* ihavep = ihaveCons(buf, &haschunkList);
+		unsigned int bufSize = ((packetHead *)ihavep)->packLen;
+		spiffy_sendto(sock, ihavep, bufSize, 0, (struct sockaddr *) &from, fromlen);
 		break;
-	
+	case IHAVE:
+		printf("Receieve IHAVE request");
+		printf("packet length is %u\n", pHead->packLen);
+		char tmp[20];
+		memcpy(tmp, (buf+20), 20);
+		printf("chunk hash: %s\n", tmp);
+		
+		peerEle* thisPeer = resolvePeer(from, peerList);
+		AddResponses(thisPeer, buf, &chunkList);
+		printChunkList(chunkList);
 	}
   printf("PROCESS_INBOUND_UDP SKELETON -- replace!\n"
 	 "Incoming message from %s:%d\n%s\n\n", 
@@ -90,39 +99,15 @@ void process_inbound_udp(int sock) {
 }
 
 void process_get(char *chunkfile, char *outputfile) {
-	FILE* fp;
-	char locBuf[100];
-	unsigned int id;
-	char hash[20];
-	unsigned int i,j;
-	
-	
-	/* parse chunkfile*/
-	if((fp = fopen(chunkfile, "r")) == NULL){
-		fprintf(stderr,"Error opening %s",chunkfile);
-		exit(1);
-	}
-	
-	while(fgets(locBuf,sizeof(locBuf),fp)){
-		/* read each line in chunkfile */
-		if(sscanf(locBuf,"%d %20c",&id,hash) < 2){
-			fprintf(stderr,"Malformed chunkfile %s",chunkfile);
-			exit(1);
-		}
-		
-		/* add new chunk entry in list */
-		chunkEle* ele = initChunkEle(id,hash);
-		node* newNode = initNode(ele);
-		addList(newNode, &chunkList);
-	}
+	parseChunkFile(chunkfile, &chunkList);
 	printChunkList(chunkList);
-	
+	int i;
+	int j;
 	/* needed if too many chunks for one packet */
 	for(i = 0; i < chunkList.length; i += MAXCHUNKS){
 		void* whohasp = whohasCons(&chunkList, i);
 		unsigned int bufSize = ((packetHead *)whohasp)->packLen;
-		node* itr = peerList.headp;
-			
+		node* itr = peerList.headp;	
 		for(j = 0; j < peerList.length; j++){
 	      peerEle* thisPeer = (peerEle*)itr->data;
 	 		if( thisPeer->id != myId ){
@@ -159,6 +144,8 @@ void peer_run(bt_config_t *config) {
   myId = config->identity;
   // parse peer list file
   parsePeerFile(config->peer_list_file);
+  // parse has chunk file
+  parseChunkFile(config->has_chunk_file, &haschunkList);
 
   if ((userbuf = create_userbuf()) == NULL) {
     perror("peer_run could not allocate userbuf");
@@ -191,7 +178,6 @@ void peer_run(bt_config_t *config) {
     
     if (nfds > 0) {
       if (FD_ISSET(sock, &readfds)) {
-		printf("Receive something from UDP port");
 		process_inbound_udp(sock);
       }
       
@@ -235,7 +221,12 @@ void parsePeerFile(char* peerFile){
 	   	ele->cli_addr.sin_family = AF_INET;
 		ele->cli_addr.sin_addr.s_addr = *(in_addr_t *)h->h_addr;
   		ele->cli_addr.sin_port = htons(port);
-	
+		
+		
+		memcpy(ele->host, hostname, strlen(hostname));
+		ele->port = port;
+		
+		
 		node* newNode = initNode(ele);
 		addList(newNode, &peerList);
 	}
@@ -243,4 +234,28 @@ void parsePeerFile(char* peerFile){
 	return;
 }
 
+void parseChunkFile(char* chunkfile, linkedList* list){
+	FILE* fp;
+	char locBuf[100];
+	unsigned int id;
+	char hash[20];
+	/* parse chunkfile*/
+	if((fp = fopen(chunkfile, "r")) == NULL){
+		fprintf(stderr,"Error opening %s",chunkfile);
+		exit(1);
+	}
+	
+	while(fgets(locBuf,sizeof(locBuf),fp)){
+		/* read each line in chunkfile */
+		if(sscanf(locBuf,"%d %20c",&id,hash) < 2){
+			fprintf(stderr,"Malformed chunkfile %s",chunkfile);
+			exit(1);
+		}
+		
+		/* add new chunk entry in list */
+		chunkEle* ele = initChunkEle(id,hash);
+		node* newNode = initNode(ele);
+		addList(newNode, list);
+	}
+}
 
