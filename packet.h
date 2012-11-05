@@ -17,3 +17,4 @@
 
 void* whohasCons(linkedList* listp, unsigned int start);
 void* ihaveCons(char* buf, linkedList* chunkList);
+void* getCons(char hash[20]);
