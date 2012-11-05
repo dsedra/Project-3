@@ -205,7 +205,7 @@ void parsePeerFile(char* peerFile){
 	while(fgets(locBuf,sizeof(locBuf),fp)){
 		/* read each line in peerfile */
 		if(sscanf(locBuf,"%u %s %u",&id,hostname,&port) < 2){
-			fprintf(stderr,"Malformed chunkfile %s",peerFile);
+			fprintf(stderr,"Malformed chunkfile %s\n",peerFile);
 			continue;
 		}
 		
@@ -248,8 +248,7 @@ void parseChunkFile(char* chunkfile, linkedList* list){
 	while(fgets(locBuf,sizeof(locBuf),fp)){
 		/* read each line in chunkfile */
 		if(sscanf(locBuf,"%d %20c",&id,hash) < 2){
-			fprintf(stderr,"Malformed chunkfile %s",chunkfile);
-			exit(1);
+			fprintf(stderr,"Malformed chunkfile %s\n",chunkfile);
 		}
 		
 		/* add new chunk entry in list */
