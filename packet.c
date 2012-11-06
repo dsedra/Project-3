@@ -92,3 +92,16 @@ void* getCons(char hash[sizeofHash]){
 	
 	return packet;
 }
+
+void* ackCons(unsigned int seq){
+	void* packet = malloc(headerSize);
+	packetHead* pHp = (packetHead*) packet;
+	pHp->magicNum = MAGICNUM;
+	pHp->version = VERSION;
+	pHp->type = ACK;
+	pHp->headerLen = headerSize;
+	pHp->packLen = headerSize;
+	pHp->seqNum = 0;
+	pHp->ackNum = seq;
+	return packet;
+}

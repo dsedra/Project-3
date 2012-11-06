@@ -13,6 +13,9 @@ typedef struct cE{
 	FILE* masterfp;
 	int windowSize;
 	
+	// receiver side fields
+	unsigned int nextExpectedSeq;
+	
 	// number of byte read from file or receive from sender
 	// this can be used by both sender and receiver
 	int bytesRead;

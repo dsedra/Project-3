@@ -126,11 +126,19 @@ void process_inbound_udp(int sock) {
 		void* newBuf = malloc(bufSize);
 		memcpy(newBuf,buf,bufSize);
 		chunkEle* cep = resolveChunk(peer, chunkList);
-		orderedAdd(cep,newBuf);			
-		//printf("Receive DATA with seq %d\n", *(int *)(buf+8));
+		orderedAdd(cep,newBuf);
 		printPacketList(cep->packetList);
+		void* packet = ackCons(cep->nextExpectedSeq);
+		// instead, we need to find out the next expect seq, not simple increment
+		cep->nextExpectedSeq ++;
+		spiffy_sendto(sock, packet, headerSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
 		break;
 	}
+	case ACK:{
+		printf("Receive Ack %d\n", *(int*)(buf+12));
+		break;
+	}
+	
 	
 	}
   printf("PROCESS_INBOUND_UDP SKELETON -- replace!\n"

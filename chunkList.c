@@ -126,6 +126,8 @@ void AddResponses(peerEle* thisPeer, char* buf, linkedList* chunkList, int sock)
 		chunkEle* thisChunk = lookupChunkHash(hash, chunkList);
 		if(!(thisChunk->fromThisPeer)){
 			thisChunk->fromThisPeer = thisPeer;
+			// initialize the next expected seq num to 1 here, may be put in another place
+			thisChunk->nextExpectedSeq = 1;
 			void* getPack = getCons(thisChunk->chunkHash);
 			printf("Send packet to peer %d @  %s:%d\n", thisPeer->id, inet_ntoa(thisPeer->cli_addr.sin_addr) ,ntohs(thisPeer->cli_addr.sin_port));
 			spiffy_sendto(sock, getPack, 40, 0, (struct sockaddr *) &thisPeer->cli_addr, sizeof(thisPeer->cli_addr));
