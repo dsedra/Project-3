@@ -16,6 +16,7 @@ typedef struct n{
 typedef struct ll{
 	node* headp;
 	unsigned int length;
+	int finished;
 }linkedList;
 
 

@@ -16,6 +16,8 @@ chunkEle* initChunkEle(unsigned int id, char hash[20]){
 	memcpy(ele->chunkHash,hash,20);
 	ele->packetList.headp = NULL;
 	ele->packetList.length = 0;
+	ele->bytesRead = 0;
+	ele->inProgress = 0;
 	return ele;
 }
 
@@ -128,9 +130,8 @@ void AddResponses(peerEle* thisPeer, char* buf, linkedList* chunkList, int sock)
 			thisChunk->fromThisPeer = thisPeer;
 			// initialize the next expected seq num to 1 here, may be put in another place
 			thisChunk->nextExpectedSeq = 1;
-			thisChunk->bytesRead = 0;
-			
 			if( thisChunk->fromThisPeer->inUse == 0){
+				thisChunk->inProgress = 1;
 				thisChunk->fromThisPeer->inUse = 1; 
 				void* getPack = getCons(thisChunk->chunkHash);
 				printf("Send GET request to peer %d @  %s:%d\n", thisPeer->id, inet_ntoa(thisPeer->cli_addr.sin_addr) ,ntohs(thisPeer->cli_addr.sin_port));
@@ -140,6 +141,27 @@ void AddResponses(peerEle* thisPeer, char* buf, linkedList* chunkList, int sock)
 		curr += sizeofHash;
 	}
 }
+
+void sendPendingGetRequest(linkedList* chunkList, int sock){
+	int i;
+	node* itr = chunkList->headp;
+	for(i = 0 ; i < chunkList->length; i ++){
+		chunkEle*  thisELe = (chunkEle* )itr->data;
+		
+		if((thisELe->fromThisPeer) && (thisELe->fromThisPeer->inUse == 0) && (thisELe->bytesRead == 0)){
+			thisELe->fromThisPeer->inUse = 1; 
+			thisELe->inProgress = 1;
+			void* getPack = getCons(thisELe->chunkHash);
+			printf("Send GET request to peer %d @  %s:%d\n", thisELe->fromThisPeer->id, inet_ntoa(thisELe->fromThisPeer->cli_addr.sin_addr) ,ntohs(thisELe->fromThisPeer->cli_addr.sin_port));
+			spiffy_sendto(sock, getPack, 40, 0, (struct sockaddr *) &(thisELe->fromThisPeer->cli_addr), sizeof(thisELe->fromThisPeer->cli_addr));
+		}
+		
+		itr = itr->nextp;
+	}
+	
+}
+
+
 
 void orderedAdd(chunkEle* cep, void* buf){
 	node* curp = cep->packetList.headp;
@@ -158,7 +180,7 @@ void orderedAdd(chunkEle* cep, void* buf){
 	}
 	else{
 		int yes = 0;
-		printf("Before add, head is %d\n", ((packetHead*)cep->packetList.headp->data)->seqNum);
+		//printf("Before add, head is %d\n", ((packetHead*)cep->packetList.headp->data)->seqNum);
 		if( target < ((packetHead*)cep->packetList.headp->data)->seqNum){
 			yes = 1;
 		}
@@ -166,7 +188,7 @@ void orderedAdd(chunkEle* cep, void* buf){
 		int i;
 		for( i = 0 ; i < cep->packetList.length ; i++){
 			unsigned int currSeq = ((packetHead* )curp->data)->seqNum;
-			printf("curr:%d, target:%d\n",currSeq, target);
+			//printf("curr:%d, target:%d\n",currSeq, target);
 			if( target < currSeq){
 				newNode->nextp = curp;
 				newNode->prevp = curp->prevp;
@@ -183,7 +205,7 @@ void orderedAdd(chunkEle* cep, void* buf){
 		}
 		// back to the end
 		curp = curp->prevp;
-		printf("Add after %d\n", ((packetHead* )curp->data)->seqNum);
+		//printf("Add after %d\n", ((packetHead* )curp->data)->seqNum);
 		newNode->nextp = cep->packetList.headp;
 		cep->packetList.headp->prevp = newNode;
 		newNode->prevp = curp;
@@ -197,7 +219,7 @@ chunkEle* resolveChunk(peerEle* peerp, linkedList list){
 	node* curp = list.headp;
 	do{
 		chunkEle* thisEle = (chunkEle*)(curp->data);
-		if(thisEle->fromThisPeer == peerp)
+		if(thisEle->fromThisPeer == peerp && thisEle->inProgress == 1)
 			return thisEle;
 		curp = curp->nextp;
 	}while(curp != list.headp);
@@ -248,7 +270,7 @@ chunkEle* buildNewWindow(linkedList* windowSets, linkedList* hasChunkList, peerE
 	thisWindow->windowSize = fixedWindowSize;
 	thisWindow->lastSent = NULL;
 	thisWindow->lastAcked = NULL;
-	
+	thisWindow->inProgress = 1;
 	if((fp = fopen(masterDataFilePath, "r")) == NULL){
 		fprintf(stderr,"Error opening %s",masterDataFilePath);
 		exit(1);

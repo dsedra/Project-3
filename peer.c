@@ -124,29 +124,63 @@ void process_inbound_udp(int sock) {
 		break;
 	}
 	case DATA:{
+		printf("Receive data packet %d\n", ((packetHead *)buf)->seqNum);
 		unsigned int bufSize = ((packetHead *)buf)->packLen;
 		void* newBuf = malloc(bufSize);
 		memcpy(newBuf,buf,bufSize);
 		chunkEle* cep = resolveChunk(peer, chunkList);
 		orderedAdd(cep,newBuf);
-		printPacketList(cep->packetList);
+		//printPacketList(cep->packetList);
 		void* packet = ackCons(cep->nextExpectedSeq);
 		// instead, we need to find out the next expect seq, not simple increment
 		cep->nextExpectedSeq ++;
 		spiffy_sendto(sock, packet, headerSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
+		
+		//check if finish receiving the whole chunk
+		if(cep->bytesRead == chunkSize ){
+			printf("Sucessfully receive the chunk %s\n", cep->chunkHash);
+			chunkList.finished ++;
+			cep->fromThisPeer->inUse = 0;
+			cep->inProgress = 0;
+			if(chunkList.finished == chunkList.length){
+				printf("Finish receiving the whole file\n");
+				// merge the chunks and write to the corresponding output file
+			}else{
+				// try to send rest of pending get requests 
+				// they are deferred to make sure no concurrent downloading from the same peer
+				sendPendingGetRequest(&chunkList, sock);
+			}
+		}
+		
 		break;
 	}
 	case ACK:{
 		printf("Receive Ack %d\n", *(int*)(buf+12));
 		chunkEle* cep = resolveChunk(peer, windowSets);
 		cep->lastAcked = resolveLastPacketAcked( ((packetHead*)buf)->ackNum, cep->packetList);
-
+		
+		//check if finish sending the whole chunk
+		if( cep->bytesRead == chunkSize ){
+			printf("Successfully send the chunk %s\n", cep->chunkHash);
+			if(cep->lastAcked == cep->lastSent){
+				// some clear below
+				printf("All sent packets have been acked\n");
+				cep->inProgress = 0;
+			}else{
+				printf("lastAcked:%d, lastSent:%d\n",((packetHead*)cep->lastAcked->data)->seqNum, ((packetHead*)cep->lastSent->data)->seqNum );
+			}
+			
+		}else{
 		int sizeToRead = min(chunkSize - cep->bytesRead , 1500-headerSize);
 		unsigned int seqToSend = ((packetHead* )cep->lastSent->data)->seqNum + 1;
 		void* packet = nextDataPacket(cep->masterfp, seqToSend , sizeToRead);
 		node* newNode = initNode(packet);
 		addList(newNode, &(cep->packetList));
+		spiffy_sendto(sock, packet, ((packetHead* )packet)->packLen, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
 		cep->lastSent = newNode;
+		cep->bytesRead += sizeToRead;
+		printf("Bytes read: %d\n", cep->bytesRead);
+		}
 		break;
 	}
 	
@@ -308,7 +342,8 @@ void parseChunkFile(char* chunkfile, linkedList* list){
 		fprintf(stderr,"Error opening %s",chunkfile);
 		exit(1);
 	}
-	
+	list->length = 0;
+	list->finished = 0;
 	while(fgets(locBuf, sizeof(locBuf),fp)){
 		/* read each line in chunkfile */
 		if(sscanf(locBuf,"%d %20c",&id,hash) < 2){

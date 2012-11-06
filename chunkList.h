@@ -19,7 +19,7 @@ typedef struct cE{
 	// number of byte read from file or receive from sender
 	// this can be used by both sender and receiver
 	int bytesRead;
-	
+	int inProgress;
 	
 }chunkEle;
 	
@@ -37,3 +37,4 @@ chunkEle* buildNewWindow(linkedList* windowSets, linkedList* hasChunkList, peerE
 void orderedAdd(chunkEle* cep, void* buf);
 chunkEle* resolveChunk(peerEle* peerp, linkedList list);
 node* resolveLastPacketAcked(unsigned int target, linkedList packetList);
+void sendPendingGetRequest(linkedList* chunkList, int sock);
