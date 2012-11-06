@@ -128,9 +128,14 @@ void AddResponses(peerEle* thisPeer, char* buf, linkedList* chunkList, int sock)
 			thisChunk->fromThisPeer = thisPeer;
 			// initialize the next expected seq num to 1 here, may be put in another place
 			thisChunk->nextExpectedSeq = 1;
-			void* getPack = getCons(thisChunk->chunkHash);
-			printf("Send packet to peer %d @  %s:%d\n", thisPeer->id, inet_ntoa(thisPeer->cli_addr.sin_addr) ,ntohs(thisPeer->cli_addr.sin_port));
-			spiffy_sendto(sock, getPack, 40, 0, (struct sockaddr *) &thisPeer->cli_addr, sizeof(thisPeer->cli_addr));
+			thisChunk->bytesRead = 0;
+			
+			if( thisChunk->fromThisPeer->inUse == 0){
+				thisChunk->fromThisPeer->inUse = 1; 
+				void* getPack = getCons(thisChunk->chunkHash);
+				printf("Send GET request to peer %d @  %s:%d\n", thisPeer->id, inet_ntoa(thisPeer->cli_addr.sin_addr) ,ntohs(thisPeer->cli_addr.sin_port));
+				spiffy_sendto(sock, getPack, 40, 0, (struct sockaddr *) &thisPeer->cli_addr, sizeof(thisPeer->cli_addr));
+		}
 		}
 		curr += sizeofHash;
 	}
@@ -139,8 +144,11 @@ void AddResponses(peerEle* thisPeer, char* buf, linkedList* chunkList, int sock)
 void orderedAdd(chunkEle* cep, void* buf){
 	node* curp = cep->packetList.headp;
 	unsigned int target = ((packetHead*)buf)->seqNum;
+	int contentLength = ((packetHead*)buf)->packLen - headerSize;
+	cep->bytesRead += contentLength;
 	node* newNode = initNode(buf);
-
+	
+	
 	if(cep->packetList.headp == NULL){
 		newNode->nextp = newNode;
 		newNode->prevp = newNode;
@@ -187,17 +195,28 @@ void orderedAdd(chunkEle* cep, void* buf){
 
 chunkEle* resolveChunk(peerEle* peerp, linkedList list){
 	node* curp = list.headp;
-
 	do{
 		chunkEle* thisEle = (chunkEle*)(curp->data);
 		if(thisEle->fromThisPeer == peerp)
 			return thisEle;
 		curp = curp->nextp;
 	}while(curp != list.headp);
-
-
 	return NULL;
 }
+
+node* resolveLastPacketAcked(unsigned int target, linkedList packetList){
+	node* curp = packetList.headp;
+	do{
+		unsigned int seq = ((packetHead*)curp->data)->seqNum;
+		if( target == seq ){
+			printf("Resolve last ack as %d\n", target);
+			return curp;
+		}	
+		curp = curp->nextp;
+	}while(curp != packetList.headp);
+	return NULL;
+}
+
 
 // return the next data packet based on offset, size need to read and seq
 void* nextDataPacket(FILE* fp, int seq, int size){

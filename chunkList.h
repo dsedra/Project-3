@@ -36,3 +36,4 @@ void* nextDataPacket(FILE* fp, int seq, int size);
 chunkEle* buildNewWindow(linkedList* windowSets, linkedList* hasChunkList, peerEle* peer, char* masterDataFilePath, char* buf);
 void orderedAdd(chunkEle* cep, void* buf);
 chunkEle* resolveChunk(peerEle* peerp, linkedList list);
+node* resolveLastPacketAcked(unsigned int target, linkedList packetList);

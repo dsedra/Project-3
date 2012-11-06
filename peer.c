@@ -27,6 +27,8 @@
 #include "packet.h"
 #include "chunkList.h"
 
+#define min(a,b) ((a<=b)?a:b)
+
 linkedList chunkList;
 linkedList peerList;
 linkedList haschunkList;
@@ -136,6 +138,15 @@ void process_inbound_udp(int sock) {
 	}
 	case ACK:{
 		printf("Receive Ack %d\n", *(int*)(buf+12));
+		chunkEle* cep = resolveChunk(peer, windowSets);
+		cep->lastAcked = resolveLastPacketAcked( ((packetHead*)buf)->ackNum, cep->packetList);
+
+		int sizeToRead = min(chunkSize - cep->bytesRead , 1500-headerSize);
+		unsigned int seqToSend = ((packetHead* )cep->lastSent->data)->seqNum + 1;
+		void* packet = nextDataPacket(cep->masterfp, seqToSend , sizeToRead);
+		node* newNode = initNode(packet);
+		addList(newNode, &(cep->packetList));
+		cep->lastSent = newNode;
 		break;
 	}
 	
@@ -278,7 +289,7 @@ void parsePeerFile(char* peerFile){
 		
 		memcpy(ele->host, hostname, strlen(hostname));
 		ele->port = port;
-		
+		ele->inUse = 0;
 		
 		node* newNode = initNode(ele);
 		addList(newNode, &peerList);
@@ -323,5 +334,3 @@ void parseMasterChunkFile(char* masterChunkFile){
 	sscanf(localbuf, "File: %s", masterDataFilePath);
 	fclose(fp);
 }
-
-
