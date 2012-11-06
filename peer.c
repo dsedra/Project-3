@@ -34,7 +34,7 @@ linkedList peerList;
 linkedList haschunkList;
 linkedList windowSets;
 char masterDataFilePath[100];
-
+FILE* outputFile;
 
 /* global udp socket */
 int sock;
@@ -145,6 +145,9 @@ void process_inbound_udp(int sock) {
 			if(chunkList.finished == chunkList.length){
 				printf("Finish receiving the whole file\n");
 				// merge the chunks and write to the corresponding output file
+				buildOuputFile(outputFile, &chunkList);
+				fclose(outputFile);
+				printf("GOT output file\n");
 			}else{
 				// try to send rest of pending get requests 
 				// they are deferred to make sure no concurrent downloading from the same peer
@@ -196,6 +199,12 @@ void process_inbound_udp(int sock) {
 void process_get(char *chunkfile, char *outputfile) {
 	parseChunkFile(chunkfile, &chunkList);
 	printChunkList(chunkList);
+	
+	if((outputFile = fopen(outputfile, "w")) == NULL){
+		fprintf(stderr,"Error opening %s\n",outputfile);
+		exit(1);
+	}
+	
 	int i;
 	int j;
 	/* needed if too many chunks for one packet */

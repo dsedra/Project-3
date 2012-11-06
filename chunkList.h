@@ -38,3 +38,5 @@ void orderedAdd(chunkEle* cep, void* buf);
 chunkEle* resolveChunk(peerEle* peerp, linkedList list);
 node* resolveLastPacketAcked(unsigned int target, linkedList packetList);
 void sendPendingGetRequest(linkedList* chunkList, int sock);
+int writeChunkToFile(FILE* outfile, linkedList* packetList);
+int buildOuputFile(FILE* outfile, linkedList* chunkList);

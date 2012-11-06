@@ -292,4 +292,32 @@ chunkEle* buildNewWindow(linkedList* windowSets, linkedList* hasChunkList, peerE
 	return thisWindow;
 }
 
+int writeChunkToFile(FILE* outfile, linkedList* packetList){
+	node* itr = packetList->headp;
+	int sum = 0;
+	do{
+		void* thisPacket = itr->data;
+		int bufSize = ((packetHead* )thisPacket)->packLen - headerSize;
+		fwrite(thisPacket + headerSize ,bufSize, 1 , outfile);
+		sum += bufSize;
+		itr = itr->nextp;
+	}while(itr != packetList->headp );
+	return sum;
+}
+
+int buildOuputFile(FILE* outfile, linkedList* chunkList){
+	node* curr = chunkList->headp->prevp;
+	int sum = 0;
+	int i;
+	for( i = 0; i < chunkList->length; i++ ){
+		chunkEle* thisChunk = (chunkEle* )curr->data;
+		int chunkWrites = writeChunkToFile( outfile, &thisChunk->packetList);
+		sum += chunkWrites;
+		printf("Write chunk %d, size %d to file\n",thisChunk->chunkId,  chunkWrites);
+		curr = curr->prevp;
+	}
+	return sum;
+}
+
+
 
