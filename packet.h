@@ -2,6 +2,9 @@
 #define headerSize 16
 #define numChunks 4 /* 1 byte for num chunks, rest padding */
 #define sizeofHash 20
+#define chunkSize (512*1024)
+#define fixedWindowSize 8
+
 
 #define WHOHAS 0
 #define IHAVE 1

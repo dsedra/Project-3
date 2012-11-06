@@ -115,5 +115,56 @@ void AddResponses(peerEle* thisPeer, char* buf, linkedList* chunkList, int sock)
 	}
 }
 
+// return the next data packet based on offset, size need to read and seq
+void* nextDataPacket(FILE* fp, int seq, int size){
+	//fseek(fp, offset, SEEK_SET);
+	void* packet = malloc(headerSize + size);
+	packetHead* pHp = (packetHead*) packet;
+	pHp->magicNum = MAGICNUM;
+	pHp->version = VERSION;
+	pHp->type = DATA;
+	pHp->headerLen = headerSize;
+	pHp->packLen = headerSize +size;
+	pHp->seqNum = seq;
+	pHp->ackNum = 0;
+	void* packetPtr = packet + headerSize; // beginning of chunk data
+	fread(packetPtr, size, 1, fp);
+	return packet;
+}
+
+chunkEle* buildNewWindow(linkedList* windowSets, linkedList* hasChunkList, peerEle* peer, char* masterDataFilePath, char* buf){
+	FILE* fp;
+	char* curr = buf;
+	curr = curr + headerSize + numChunks;// beginning of the chunks
+	char hash[20];
+	sscanf( curr, "%20c", hash );
+	chunkEle* thisChunk = lookupChunkHash(hash, hasChunkList);
+	chunkEle* thisWindow = initChunkEle( thisChunk->chunkId, thisChunk->chunkHash);
+	thisWindow->fromThisPeer = peer;
+	thisWindow->bytesRead = 0;
+	thisWindow->windowSize = fixedWindowSize;
+	thisWindow->lastSent = NULL;
+	thisWindow->lastAcked = NULL;
+	
+	if((fp = fopen(masterDataFilePath, "r")) == NULL){
+		fprintf(stderr,"Error opening %s",masterDataFilePath);
+		exit(1);
+	}
+	// need to lookup master data file
+	long offset = thisWindow->chunkId * chunkSize;
+	int size = 1500 - headerSize;
+	int seq; 
+	fseek(fp, offset, SEEK_SET);
+	for( seq = 1; seq <= fixedWindowSize; seq ++ ){
+		void* thisPacket = nextDataPacket(fp, seq, size);
+		thisWindow->bytesRead += size;
+		node* newNode = initNode(thisPacket);
+		addList(newNode, &(thisWindow->packetList));
+	}
+	thisWindow->masterfp = fp;
+	node* wNode = initNode(thisWindow);
+	addList(wNode, windowSets);
+	return thisWindow;
+}
 
 

@@ -30,6 +30,9 @@
 linkedList chunkList;
 linkedList peerList;
 linkedList haschunkList;
+linkedList windowSets;
+char masterDataFilePath[100];
+
 
 /* global udp socket */
 int sock;
@@ -37,6 +40,7 @@ int myId;
 void peer_run(bt_config_t *config);
 void parsePeerFile(char* peerFile);
 void parseChunkFile(char* chunkfile, linkedList* list);
+void parseMasterChunkFile(char* masterChunkFile);
 
 int main(int argc, char **argv) {
   bt_config_t config;
@@ -67,7 +71,7 @@ void process_inbound_udp(int sock) {
   #define BUFLEN 1500
   struct sockaddr_in from;
   socklen_t fromlen;
-  unsigned char buf[BUFLEN];
+  char buf[BUFLEN];
 
   fromlen = sizeof(from);
   spiffy_recvfrom(sock, buf, BUFLEN, 0, (struct sockaddr *) &from, &fromlen);
@@ -83,20 +87,39 @@ void process_inbound_udp(int sock) {
 		}
 		break;
 	case IHAVE:
-		printf("Receieve IHAVE request");
+		printf("Receieve IHAVE request\n");
 		printf("packet length is %u\n", pHead->packLen);
 		char tmp[20];
 		memcpy(tmp, (buf+20), 20);
 		printf("chunk hash: %s\n", tmp);
-		
 		peerEle* thisPeer = resolvePeer(from, peerList);
-		
 		if( thisPeer == NULL ){
 			printf("RESOLVE FAILED\n");
 		}
-		
 		AddResponses(thisPeer, buf, &chunkList, sock);
 		printChunkList(chunkList);
+		break;
+	case GET:
+		printf("Receive GET Request\n");
+		printf("packet length is %u\n", pHead->packLen);
+		//need to resolve peer 
+		peerEle* peer = resolvePeer(from, peerList);
+		chunkEle* thisWindow = buildNewWindow(&windowSets, &haschunkList, peer, masterDataFilePath, buf);
+		// here we try to send the full window of packets out
+		int i;
+		node* curr = thisWindow->packetList.headp;
+		for( i = 0 ; i < thisWindow->windowSize ; i++){
+			void* packet = curr->data;
+			unsigned int bufSize = ((packetHead *)packet)->packLen;
+			spiffy_sendto(sock, packet, bufSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
+			thisWindow->lastSent = curr; 
+			curr = curr->nextp;
+		}
+		break;
+	case DATA:
+		printf("Receive DATA with seq %d\n", *(int *)(buf+8));
+		break;
+	
 	}
   printf("PROCESS_INBOUND_UDP SKELETON -- replace!\n"
 	 "Incoming message from %s:%d\n%s\n\n", 
@@ -153,7 +176,11 @@ void peer_run(bt_config_t *config) {
   parsePeerFile(config->peer_list_file);
   // parse has chunk file
   parseChunkFile(config->has_chunk_file, &haschunkList);
-
+  // parse master chunk file to get the path of master data file
+  parseMasterChunkFile(config->chunk_file);		
+  printf("The master data file name: %s\n", masterDataFilePath);
+	
+	
   if ((userbuf = create_userbuf()) == NULL) {
     perror("peer_run could not allocate userbuf");
     exit(-1);
@@ -237,7 +264,7 @@ void parsePeerFile(char* peerFile){
 		node* newNode = initNode(ele);
 		addList(newNode, &peerList);
 	}
-	
+	fclose(fp);
 	return;
 }
 
@@ -252,7 +279,7 @@ void parseChunkFile(char* chunkfile, linkedList* list){
 		exit(1);
 	}
 	
-	while(fgets(locBuf,sizeof(locBuf),fp)){
+	while(fgets(locBuf, sizeof(locBuf),fp)){
 		/* read each line in chunkfile */
 		if(sscanf(locBuf,"%d %20c",&id,hash) < 2){
 			fprintf(stderr,"Malformed chunkfile %s\n",chunkfile);
@@ -263,5 +290,19 @@ void parseChunkFile(char* chunkfile, linkedList* list){
 		node* newNode = initNode(ele);
 		addList(newNode, list);
 	}
+	fclose(fp);
 }
+
+void parseMasterChunkFile(char* masterChunkFile){
+	FILE* fp;
+	if((fp = fopen(masterChunkFile, "r")) == NULL){
+		fprintf(stderr,"Error opening %s",masterChunkFile);
+		exit(1);
+	}
+	char localbuf[100];
+	fgets(localbuf, 100, fp);
+	sscanf(localbuf, "File: %s", masterDataFilePath);
+	fclose(fp);
+}
+
 

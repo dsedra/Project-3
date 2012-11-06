@@ -83,7 +83,7 @@ void* getCons(char hash[sizeofHash]){
 	pHp->version = VERSION;
 	pHp->type = GET;
 	pHp->headerLen = headerSize;
-	pHp->packLen = headerSize + numChunks;// this is temporary
+	pHp->packLen = headerSize + numChunks+sizeofHash;
 	pHp->seqNum = 0;
 	pHp->ackNum = 0;
 	void* packetPtr = packet + headerSize + numChunks;// beginning of chunks

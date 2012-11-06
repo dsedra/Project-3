@@ -1,10 +1,23 @@
 #include "linkedList.h"
+#include <stdio.h>
 
 typedef struct cE{
 	unsigned int chunkId;
 	char chunkHash[20];
 	linkedList packetList;
 	peerEle* fromThisPeer;
+	
+	// sender side fields
+	node* lastSent;
+	node* lastAcked;
+	FILE* masterfp;
+	int windowSize;
+	
+	// number of byte read from file or receive from sender
+	// this can be used by both sender and receiver
+	int bytesRead;
+	
+	
 }chunkEle;
 	
 
@@ -15,3 +28,5 @@ chunkEle* lookupChunkHash(char target[20], linkedList* cList);
 peerEle* resolvePeer( struct sockaddr_in from, linkedList pList);
 void AddResponses(peerEle* thisPeer, char* buf, linkedList* chunkList, int sock);
 void printPeerList(linkedList pList);
+void* nextDataPacket(FILE* fp, int seq, int size);
+chunkEle* buildNewWindow(linkedList* windowSets, linkedList* hasChunkList, peerEle* peer, char* masterDataFilePath, char* buf);
