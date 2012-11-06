@@ -107,13 +107,14 @@ void process_inbound_udp(int sock) {
 		chunkEle* thisWindow = buildNewWindow(&windowSets, &haschunkList, peer, masterDataFilePath, buf);
 		// here we try to send the full window of packets out
 		int i;
-		node* curr = thisWindow->packetList.headp;
+		node* curr = thisWindow->packetList.headp->prevp;
+
 		for( i = 0 ; i < thisWindow->windowSize ; i++){
 			void* packet = curr->data;
 			unsigned int bufSize = ((packetHead *)packet)->packLen;
 			spiffy_sendto(sock, packet, bufSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
 			thisWindow->lastSent = curr; 
-			curr = curr->nextp;
+			curr = curr->prevp;
 		}
 		break;
 	case DATA:
