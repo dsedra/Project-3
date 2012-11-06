@@ -59,6 +59,25 @@ void printPeerList(linkedList pList){
 	}
 }
 
+void printPacketList(linkedList packList){
+	node* itr = packList.headp;
+	if( itr == NULL){
+		printf("No packets\n");
+		return;
+	}
+	int counter = 0;
+	do{
+		void* thisPacket = itr->data;
+		printf("Packet with seq num %d\n", ((packetHead* )thisPacket)->seqNum);
+		itr = itr->nextp;
+		counter++;
+	}while(itr != packList.headp );
+	if( counter != packList.length ){
+		printf("Length incorrect!\n");
+	}
+}
+
+
 int compareChunkHash(char hash1[20], char hash2[20]){
 	int i;
 	for(i = 0 ; i < 20 ; i++){
@@ -113,6 +132,69 @@ void AddResponses(peerEle* thisPeer, char* buf, linkedList* chunkList, int sock)
 		}
 		curr += sizeofHash;
 	}
+}
+
+void orderedAdd(chunkEle* cep, void* buf){
+	node* curp = cep->packetList.headp;
+	unsigned int target = ((packetHead*)buf)->seqNum;
+	node* newNode = initNode(buf);
+
+	if(cep->packetList.headp == NULL){
+		newNode->nextp = newNode;
+		newNode->prevp = newNode;
+		cep->packetList.headp = newNode;
+		cep->packetList.length++;
+		return;
+	}
+	else{
+		int yes = 0;
+		printf("Before add, head is %d\n", ((packetHead*)cep->packetList.headp->data)->seqNum);
+		if( target < ((packetHead*)cep->packetList.headp->data)->seqNum){
+			yes = 1;
+		}
+		
+		int i;
+		for( i = 0 ; i < cep->packetList.length ; i++){
+			unsigned int currSeq = ((packetHead* )curp->data)->seqNum;
+			printf("curr:%d, target:%d\n",currSeq, target);
+			if( target < currSeq){
+				newNode->nextp = curp;
+				newNode->prevp = curp->prevp;
+				newNode->prevp->nextp = newNode;
+				newNode->nextp->prevp = newNode;
+				if( yes ){
+					printf("head switches to %d\n", target);
+					cep->packetList.headp = newNode;
+				}
+				cep->packetList.length++;
+				return;
+			}
+			curp = curp->nextp;
+		}
+		// back to the end
+		curp = curp->prevp;
+		printf("Add after %d\n", ((packetHead* )curp->data)->seqNum);
+		newNode->nextp = cep->packetList.headp;
+		cep->packetList.headp->prevp = newNode;
+		newNode->prevp = curp;
+		curp->nextp = newNode;
+		cep->packetList.length++;
+		return;
+	}
+}
+
+chunkEle* resolveChunk(peerEle* peerp, linkedList list){
+	node* curp = list.headp;
+
+	do{
+		chunkEle* thisEle = (chunkEle*)(curp->data);
+		if(thisEle->fromThisPeer == peerp)
+			return thisEle;
+		curp = curp->nextp;
+	}while(curp != list.headp);
+
+
+	return NULL;
 }
 
 // return the next data packet based on offset, size need to read and seq

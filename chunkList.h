@@ -22,6 +22,7 @@ typedef struct cE{
 	
 
 chunkEle* initChunkEle(unsigned int id, char hash[20]);
+void printPacketList(linkedList packList);
 void printChunkList(linkedList clist);
 int compareChunkHash(char hash1[20], char hash2[20]);
 chunkEle* lookupChunkHash(char target[20], linkedList* cList);
@@ -30,3 +31,5 @@ void AddResponses(peerEle* thisPeer, char* buf, linkedList* chunkList, int sock)
 void printPeerList(linkedList pList);
 void* nextDataPacket(FILE* fp, int seq, int size);
 chunkEle* buildNewWindow(linkedList* windowSets, linkedList* hasChunkList, peerEle* peer, char* masterDataFilePath, char* buf);
+void orderedAdd(chunkEle* cep, void* buf);
+chunkEle* resolveChunk(peerEle* peerp, linkedList list);

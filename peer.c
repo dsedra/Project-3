@@ -76,17 +76,18 @@ void process_inbound_udp(int sock) {
   fromlen = sizeof(from);
   spiffy_recvfrom(sock, buf, BUFLEN, 0, (struct sockaddr *) &from, &fromlen);
   packetHead* pHead = (packetHead* )buf;
-  
+  peerEle* peer = resolvePeer(from, peerList);
   switch(pHead->type){
-	case WHOHAS:
+	case WHOHAS:{
 		printf("Recieve WHOHAS request\n");
 		void* ihavep = ihaveCons(buf, &haschunkList);
 		if( ihavep!= NULL){
-		unsigned int bufSize = ((packetHead *)ihavep)->packLen;
-		spiffy_sendto(sock, ihavep, bufSize, 0, (struct sockaddr *) &from, fromlen);
+			unsigned int bufSize = ((packetHead *)ihavep)->packLen;
+			spiffy_sendto(sock, ihavep, bufSize, 0, (struct sockaddr *) &from, fromlen);
 		}
 		break;
-	case IHAVE:
+	}
+	case IHAVE:{
 		printf("Receieve IHAVE request\n");
 		printf("packet length is %u\n", pHead->packLen);
 		char tmp[20];
@@ -99,27 +100,37 @@ void process_inbound_udp(int sock) {
 		AddResponses(thisPeer, buf, &chunkList, sock);
 		printChunkList(chunkList);
 		break;
-	case GET:
+	}
+	case GET:{
 		printf("Receive GET Request\n");
 		printf("packet length is %u\n", pHead->packLen);
 		//need to resolve peer 
-		peerEle* peer = resolvePeer(from, peerList);
+		
 		chunkEle* thisWindow = buildNewWindow(&windowSets, &haschunkList, peer, masterDataFilePath, buf);
 		// here we try to send the full window of packets out
 		int i;
 		node* curr = thisWindow->packetList.headp->prevp;
-
+		//node* curr = thisWindow->packetList.headp;
 		for( i = 0 ; i < thisWindow->windowSize ; i++){
 			void* packet = curr->data;
 			unsigned int bufSize = ((packetHead *)packet)->packLen;
 			spiffy_sendto(sock, packet, bufSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
 			thisWindow->lastSent = curr; 
 			curr = curr->prevp;
+			//curr = curr->nextp;
 		}
 		break;
-	case DATA:
-		printf("Receive DATA with seq %d\n", *(int *)(buf+8));
+	}
+	case DATA:{
+		unsigned int bufSize = ((packetHead *)buf)->packLen;
+		void* newBuf = malloc(bufSize);
+		memcpy(newBuf,buf,bufSize);
+		chunkEle* cep = resolveChunk(peer, chunkList);
+		orderedAdd(cep,newBuf);			
+		//printf("Receive DATA with seq %d\n", *(int *)(buf+8));
+		printPacketList(cep->packetList);
 		break;
+	}
 	
 	}
   printf("PROCESS_INBOUND_UDP SKELETON -- replace!\n"
@@ -165,7 +176,6 @@ void handle_user_input(char *line, void *cbdata) {
     }
   }
 }
-
 
 void peer_run(bt_config_t *config) {
   struct sockaddr_in myaddr;
