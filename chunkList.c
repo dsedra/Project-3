@@ -10,10 +10,10 @@
 #include <arpa/inet.h>
 #include "spiffy.h"
 
-chunkEle* initChunkEle(unsigned int id, char hash[20]){
+chunkEle* initChunkEle(unsigned int id, char hash[sizeofHash]){
 	chunkEle* ele = malloc(sizeof(chunkEle));
 	ele->chunkId = id;
-	memcpy(ele->chunkHash,hash,20);
+	memcpy(ele->chunkHash,hash,sizeofHash);
 	ele->packetList.headp = NULL;
 	ele->packetList.length = 0;
 	ele->bytesRead = 0;
@@ -80,9 +80,9 @@ void printPacketList(linkedList packList){
 }
 
 
-int compareChunkHash(char hash1[20], char hash2[20]){
+int compareChunkHash(char hash1[sizeofHash], char hash2[sizeofHash]){
 	int i;
-	for(i = 0 ; i < 20 ; i++){
+	for(i = 0 ; i < sizeofHash ; i++){
 		if(hash1[i] != hash2[i]){
 			return 0;
 		}
@@ -90,7 +90,7 @@ int compareChunkHash(char hash1[20], char hash2[20]){
 	return 1;
 }
 
-chunkEle* lookupChunkHash(char target[20], linkedList* cList){
+chunkEle* lookupChunkHash(char target[sizeofHash], linkedList* cList){
 	node* itr = cList->headp;
 	do{
 		chunkEle* itrChunk = (chunkEle*)(itr->data);
@@ -122,9 +122,9 @@ void AddResponses(peerEle* thisPeer, char* buf, linkedList* chunkList, int sock)
 	unsigned char numOfchunks = *(curr+headerSize);
 	curr = curr + headerSize + numChunks; // beginning of the chunks
 	int i;
-	char hash[20];
+	char hash[sizeofHash];
 	for(i = 0; i < numOfchunks ; i++){
-		sscanf( curr, "%20c", hash );
+		sscanf( curr, "%40c", hash );
 		chunkEle* thisChunk = lookupChunkHash(hash, chunkList);
 		if(!(thisChunk->fromThisPeer)){
 			thisChunk->fromThisPeer = thisPeer;
@@ -135,7 +135,7 @@ void AddResponses(peerEle* thisPeer, char* buf, linkedList* chunkList, int sock)
 				thisChunk->fromThisPeer->inUse = 1; 
 				void* getPack = getCons(thisChunk->chunkHash);
 				printf("Send GET request to peer %d @  %s:%d\n", thisPeer->id, inet_ntoa(thisPeer->cli_addr.sin_addr) ,ntohs(thisPeer->cli_addr.sin_port));
-				spiffy_sendto(sock, getPack, 40, 0, (struct sockaddr *) &thisPeer->cli_addr, sizeof(thisPeer->cli_addr));
+				spiffy_sendto(sock, getPack, sizeofGetPacket, 0, (struct sockaddr *) &thisPeer->cli_addr, sizeof(thisPeer->cli_addr));
 		}
 		}
 		curr += sizeofHash;
@@ -153,7 +153,7 @@ void sendPendingGetRequest(linkedList* chunkList, int sock){
 			thisELe->inProgress = 1;
 			void* getPack = getCons(thisELe->chunkHash);
 			printf("Send GET request to peer %d @  %s:%d\n", thisELe->fromThisPeer->id, inet_ntoa(thisELe->fromThisPeer->cli_addr.sin_addr) ,ntohs(thisELe->fromThisPeer->cli_addr.sin_port));
-			spiffy_sendto(sock, getPack, 40, 0, (struct sockaddr *) &(thisELe->fromThisPeer->cli_addr), sizeof(thisELe->fromThisPeer->cli_addr));
+			spiffy_sendto(sock, getPack, sizeofGetPacket, 0, (struct sockaddr *) &(thisELe->fromThisPeer->cli_addr), sizeof(thisELe->fromThisPeer->cli_addr));
 		}
 		
 		itr = itr->nextp;
@@ -167,6 +167,7 @@ void orderedAdd(chunkEle* cep, void* buf){
 	node* curp = cep->packetList.headp;
 	unsigned int target = ((packetHead*)buf)->seqNum;
 	int contentLength = ((packetHead*)buf)->packLen - headerSize;
+	printf("Add size %d\n", contentLength);
 	cep->bytesRead += contentLength;
 	node* newNode = initNode(buf);
 	
@@ -261,8 +262,10 @@ chunkEle* buildNewWindow(linkedList* windowSets, linkedList* hasChunkList, peerE
 	FILE* fp;
 	char* curr = buf;
 	curr = curr + headerSize + numChunks;// beginning of the chunks
-	char hash[20];
-	sscanf( curr, "%20c", hash );
+	char hash[sizeofHash];
+	sscanf( curr, "%40c", hash );
+	printf("*** hash: %s***\n", hash);
+	
 	chunkEle* thisChunk = lookupChunkHash(hash, hasChunkList);
 	chunkEle* thisWindow = initChunkEle( thisChunk->chunkId, thisChunk->chunkHash);
 	thisWindow->fromThisPeer = peer;

@@ -1,9 +1,10 @@
 #include "linkedList.h"
+#include "packet.h"
 #include <stdio.h>
 
 typedef struct cE{
 	unsigned int chunkId;
-	char chunkHash[20];
+	char chunkHash[sizeofHash];
 	linkedList packetList;
 	peerEle* fromThisPeer;
 	
@@ -24,11 +25,11 @@ typedef struct cE{
 }chunkEle;
 	
 
-chunkEle* initChunkEle(unsigned int id, char hash[20]);
+chunkEle* initChunkEle(unsigned int id, char hash[sizeofHash]);
 void printPacketList(linkedList packList);
 void printChunkList(linkedList clist);
-int compareChunkHash(char hash1[20], char hash2[20]);
-chunkEle* lookupChunkHash(char target[20], linkedList* cList);
+int compareChunkHash(char hash1[sizeofHash], char hash2[sizeofHash]);
+chunkEle* lookupChunkHash(char target[sizeofHash], linkedList* cList);
 peerEle* resolvePeer( struct sockaddr_in from, linkedList pList);
 void AddResponses(peerEle* thisPeer, char* buf, linkedList* chunkList, int sock);
 void printPeerList(linkedList pList);

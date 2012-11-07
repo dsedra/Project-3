@@ -9,7 +9,7 @@
 void* whohasCons(linkedList* listp, unsigned int start){
 	if((listp == NULL) || (listp->headp == NULL))
 		return NULL;
-	void* packet = malloc(headerSize + numChunks + 20*listp->length);
+	void* packet = malloc(headerSize + numChunks + sizeofHash*listp->length);
 	void* i = packet + headerSize + numChunks; /* beginning of chunks */
 	
 	packetHead* pHp = (packetHead*) packet;
@@ -17,7 +17,7 @@ void* whohasCons(linkedList* listp, unsigned int start){
 	pHp->version = VERSION;
 	pHp->type = WHOHAS;
 	pHp->headerLen = headerSize;
-	pHp->packLen = headerSize + numChunks + 20*listp->length;
+	pHp->packLen = headerSize + numChunks + sizeofHash*listp->length;
 	pHp->seqNum = 0;
 	pHp->ackNum = 0;
 	
@@ -57,9 +57,9 @@ void* ihaveCons(char* buf, linkedList* chunkList){
 	curr = curr+headerSize+numChunks;
 	int i;
 	int counter = 0;
-	char hash[20];
+	char hash[sizeofHash];
 	for(i = 0 ; i < *numOfchunks ; i ++){
-		sscanf( curr, "%20c", hash );
+		sscanf( curr, "%40c", hash );
 		chunkEle* thisChunk = lookupChunkHash(hash, chunkList);
 		if( thisChunk ){
 			memcpy(packetPtr, hash, sizeofHash);
@@ -77,7 +77,7 @@ void* ihaveCons(char* buf, linkedList* chunkList){
 }
 
 void* getCons(char hash[sizeofHash]){
-	void* packet = malloc(40); /* fixed and known */
+	void* packet = malloc( sizeofGetPacket); /* fixed and known */
 	packetHead* pHp = (packetHead*) packet;
 	pHp->magicNum = MAGICNUM;
 	pHp->version = VERSION;

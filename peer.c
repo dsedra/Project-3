@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include "debug.h"
 #include "spiffy.h"
 #include "bt_parse.h"
@@ -92,8 +93,8 @@ void process_inbound_udp(int sock) {
 	case IHAVE:{
 		printf("Receieve IHAVE request\n");
 		printf("packet length is %u\n", pHead->packLen);
-		char tmp[20];
-		memcpy(tmp, (buf+20), 20);
+		char tmp[sizeofHash];
+		memcpy(tmp, (buf+20), sizeofHash);
 		printf("chunk hash: %s\n", tmp);
 		peerEle* thisPeer = resolvePeer(from, peerList);
 		if( thisPeer == NULL ){
@@ -124,7 +125,10 @@ void process_inbound_udp(int sock) {
 		break;
 	}
 	case DATA:{
-		printf("Receive data packet %d\n", ((packetHead *)buf)->seqNum);
+		printf("Receive data packet %d, with size %d \n", ((packetHead *)buf)->seqNum, ((packetHead *)buf)->packLen - headerSize);
+		
+		assert(((packetHead *)buf)->packLen - headerSize == 1484);
+		
 		unsigned int bufSize = ((packetHead *)buf)->packLen;
 		void* newBuf = malloc(bufSize);
 		memcpy(newBuf,buf,bufSize);
@@ -135,7 +139,7 @@ void process_inbound_udp(int sock) {
 		// instead, we need to find out the next expect seq, not simple increment
 		cep->nextExpectedSeq ++;
 		spiffy_sendto(sock, packet, headerSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
-		
+		printf("bytes read for hash %s : %d\n",cep->chunkHash, cep->bytesRead);
 		//check if finish receiving the whole chunk
 		if(cep->bytesRead == chunkSize ){
 			printf("Sucessfully receive the chunk %s\n", cep->chunkHash);
@@ -345,7 +349,7 @@ void parseChunkFile(char* chunkfile, linkedList* list){
 	FILE* fp;
 	char locBuf[100];
 	unsigned int id;
-	char hash[20];
+	char hash[sizeofHash];
 	/* parse chunkfile*/
 	if((fp = fopen(chunkfile, "r")) == NULL){
 		fprintf(stderr,"Error opening %s",chunkfile);
@@ -355,7 +359,7 @@ void parseChunkFile(char* chunkfile, linkedList* list){
 	list->finished = 0;
 	while(fgets(locBuf, sizeof(locBuf),fp)){
 		/* read each line in chunkfile */
-		if(sscanf(locBuf,"%d %20c",&id,hash) < 2){
+		if(sscanf(locBuf,"%d %40c",&id,hash) < 2){
 			fprintf(stderr,"Malformed chunkfile %s\n",chunkfile);
 		}
 		
