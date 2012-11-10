@@ -170,12 +170,12 @@ void orderedAdd(chunkEle* cep, void* buf){
 	node* curp = cep->packetList.headp;
 	unsigned int target = ((packetHead*)buf)->seqNum;
 	int contentLength = ((packetHead*)buf)->packLen - headerSize;
-	printf("Add size %d\n", contentLength);
-	cep->bytesRead += contentLength;
+	
 	node* newNode = initNode(buf);
 	
 	
 	if(cep->packetList.headp == NULL){
+		cep->bytesRead += contentLength;
 		newNode->nextp = newNode;
 		newNode->prevp = newNode;
 		cep->packetList.headp = newNode;
@@ -194,7 +194,9 @@ void orderedAdd(chunkEle* cep, void* buf){
 			unsigned int currSeq = ((packetHead* )curp->data)->seqNum;
 			unsigned int prevSeq = ((packetHead* )curp->prevp->data)->seqNum;
 			//printf("curr:%d, target:%d\n",currSeq, target);
-			if( target < currSeq && target > prevSeq){
+			if( target < currSeq ){
+				if( target > prevSeq){
+				cep->bytesRead += contentLength;
 				newNode->nextp = curp;
 				newNode->prevp = curp->prevp;
 				newNode->prevp->nextp = newNode;
@@ -204,12 +206,15 @@ void orderedAdd(chunkEle* cep, void* buf){
 					cep->packetList.headp = newNode;
 				}
 				cep->packetList.length++;
+				
+				}
 				return;
 			}
 			curp = curp->nextp;
 		}
 		// back to the end
 		curp = curp->prevp;
+		cep->bytesRead += contentLength;
 		//printf("Add after %d\n", ((packetHead* )curp->data)->seqNum);
 		newNode->nextp = cep->packetList.headp;
 		cep->packetList.headp->prevp = newNode;
