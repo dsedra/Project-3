@@ -20,8 +20,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <signal.h>
 #include <sys/time.h>
+#include <signal.h>
 #include "debug.h"
 #include "spiffy.h"
 #include "bt_parse.h"
@@ -31,8 +31,6 @@
 #include "chunkList.h"
 
 #define min(a,b) ((a<=b)?a:b)
-#define max(a,b) ((a>=b)?a:b)
-#define ssthresh 64
 
 linkedList chunkList;
 linkedList peerList;
@@ -40,7 +38,7 @@ linkedList haschunkList;
 linkedList windowSets;
 char masterDataFilePath[100];
 FILE* outputFile;
-time_t start; /* rtt */
+time_t start;
 
 /* global udp socket */
 int sock;
@@ -104,13 +102,13 @@ void process_inbound_udp(int sock) {
 		char tmp[sizeofHash];
 		memcpy(tmp, (buf+20), sizeofHash);
 		printf("chunk hash: %s\n", tmp);
+		peerEle* thisPeer = resolvePeer(from, peerList);
 		time_t finish;
 		time(&finish);
-		peerEle* thisPeer = resolvePeer(from, peerList);
-		thisPeer->rtt = difftime(finish,start);
 		if( thisPeer == NULL ){
 			printf("RESOLVE FAILED\n");
 		}
+		thisPeer->rtt = difftime(finish, start);
 		AddResponses(thisPeer, buf, &chunkList, sock);
 		printChunkList(chunkList);
 		break;
@@ -138,8 +136,6 @@ void process_inbound_udp(int sock) {
 	}
 	case DATA:{
 		printf("Receive data packet %d, with size %d \n", ((packetHead *)buf)->seqNum, ((packetHead *)buf)->packLen - headerSize);
-		
-		//assert(((packetHead *)buf)->packLen - headerSize == 1484);
 		
 		unsigned int bufSize = ((packetHead *)buf)->packLen;
 		void* newBuf = malloc(bufSize);
