@@ -1,0 +1,3 @@
+Checkpoint 1)
+
+Our current implementation cannot handlee dropped packets (from spiffy). Therefore we use the recv_from and send_to UDP functions. 

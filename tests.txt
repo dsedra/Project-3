@@ -1,0 +1,24 @@
+Checkpoint 1)
+
+We tested our implementation by transfering chunks from two peers to a third. Our implementation is not safe to use with spiffy!
+
+Example 1(in 3 separate shells):
+
+s1>./peer -p nodes.map -c A.haschunk -f C.masterchunks -m 1 -i 1
+
+s2>./peer -p nodes.map -c B.haschunkFirst -f C.masterchunks -m 1 -i 2
+
+s3>./peer -p nodes.map -c B.haschunkSecond -f C.masterchunks -m 1 -i 3
+
+s1>GET B.haschunk B.out
+
+
+Example 2(2 shells):
+
+s1>./peer -p nodes.map -c replay.in -f C.masterchunks -m 1 -i 1
+
+s2>./peer -p nodes.map -c B.haschunk -f C.masterchunks -m 1 -i 2
+
+s2>GET replay.in replay.out
+
+s2>diff replay.out A.tar
