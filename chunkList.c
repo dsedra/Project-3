@@ -192,8 +192,9 @@ void orderedAdd(chunkEle* cep, void* buf){
 		int i;
 		for( i = 0 ; i < cep->packetList.length ; i++){
 			unsigned int currSeq = ((packetHead* )curp->data)->seqNum;
+			unsigned int prevSeq = ((packetHead* )curp->prevp->data)->seqNum;
 			//printf("curr:%d, target:%d\n",currSeq, target);
-			if( target < currSeq){
+			if( target < currSeq && target > prevSeq){
 				newNode->nextp = curp;
 				newNode->prevp = curp->prevp;
 				newNode->prevp->nextp = newNode;

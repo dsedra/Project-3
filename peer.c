@@ -147,7 +147,7 @@ void process_inbound_udp(int sock) {
 		printPacketList(cep->packetList);
 		void* packet = ackCons(cep->nextExpectedSeq - 1);
 
-
+		printf("Send Ack %d\n", cep->nextExpectedSeq - 1);
 		spiffy_sendto(sock, packet, headerSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
 		//sendto(sock, packet, headerSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
 		printf("bytes read for hash %s : %d\n",cep->chunkHash, cep->bytesRead);
