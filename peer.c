@@ -80,8 +80,8 @@ void process_inbound_udp(int sock) {
   char buf[BUFLEN];
 
   fromlen = sizeof(from);
-  //spiffy_recvfrom(sock, buf, BUFLEN, 0, (struct sockaddr *) &from, &fromlen);
-	recvfrom(sock, buf, BUFLEN, 0, (struct sockaddr *) &from, &fromlen);
+  spiffy_recvfrom(sock, buf, BUFLEN, 0, (struct sockaddr *) &from, &fromlen);
+	//recvfrom(sock, buf, BUFLEN, 0, (struct sockaddr *) &from, &fromlen);
   packetHead* pHead = (packetHead* )buf;
   peerEle* peer = resolvePeer(from, peerList);
   switch(pHead->type){
@@ -90,8 +90,8 @@ void process_inbound_udp(int sock) {
 		void* ihavep = ihaveCons(buf, &haschunkList);
 		if( ihavep!= NULL){
 			unsigned int bufSize = ((packetHead *)ihavep)->packLen;
-			//spiffy_sendto(sock, ihavep, bufSize, 0, (struct sockaddr *) &from, fromlen);
-			sendto(sock, ihavep, bufSize, 0, (struct sockaddr *) &from, fromlen);
+			spiffy_sendto(sock, ihavep, bufSize, 0, (struct sockaddr *) &from, fromlen);
+			//sendto(sock, ihavep, bufSize, 0, (struct sockaddr *) &from, fromlen);
 			time(&start);
 		}
 		break;
@@ -126,8 +126,8 @@ void process_inbound_udp(int sock) {
 		for( i = 0 ; i < thisWindow->windowSize ; i++){
 			void* packet = curr->data;
 			unsigned int bufSize = ((packetHead *)packet)->packLen;
-			//spiffy_sendto(sock, packet, bufSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
-			sendto(sock, packet, bufSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
+			spiffy_sendto(sock, packet, bufSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
+			//sendto(sock, packet, bufSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
 			thisWindow->lastSent = curr; 
 			curr = curr->prevp;
 			//curr = curr->nextp;
@@ -142,12 +142,14 @@ void process_inbound_udp(int sock) {
 		memcpy(newBuf,buf,bufSize);
 		chunkEle* cep = resolveChunk(peer, chunkList);
 		orderedAdd(cep,newBuf);
-		//printPacketList(cep->packetList);
-		void* packet = ackCons(cep->nextExpectedSeq);
-		// instead, we need to find out the next expect seq, not simple increment
-		cep->nextExpectedSeq ++;
-		//spiffy_sendto(sock, packet, headerSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
-		sendto(sock, packet, headerSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
+		
+		findMex(cep);
+		printPacketList(cep->packetList);
+		void* packet = ackCons(cep->nextExpectedSeq - 1);
+
+
+		spiffy_sendto(sock, packet, headerSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
+		//sendto(sock, packet, headerSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
 		printf("bytes read for hash %s : %d\n",cep->chunkHash, cep->bytesRead);
 		//check if finish receiving the whole chunk
 		if(cep->bytesRead == chunkSize ){
@@ -173,7 +175,22 @@ void process_inbound_udp(int sock) {
 	case ACK:{
 		printf("Receive Ack %d\n", *(int*)(buf+12));
 		chunkEle* cep = resolveChunk(peer, windowSets);
-		cep->lastAcked = resolveLastPacketAcked( ((packetHead*)buf)->ackNum, cep->packetList);
+
+		if( (cep->lastAcked) && ((packetHead* )(cep->lastAcked->data))->seqNum == ((packetHead* )(buf))->ackNum ){
+			cep->lastAckedCount ++;
+			printf("Incrementing last ack counter for %d to %d\n", ((packetHead* )(buf))->ackNum,cep->lastAckedCount);
+			if( cep->lastAckedCount  == 3 ){
+				//try retrasmit
+				cep->lastAckedCount = 0;
+				node* retry = cep->lastAcked->prevp;
+				printf("Retramsmit packet %d\n", ((packetHead* )retry->data)->seqNum);
+				spiffy_sendto(sock, retry->data, ((packetHead* )retry->data)->packLen, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
+				break;
+			}
+
+		}else{
+			cep->lastAcked = resolveLastPacketAcked( ((packetHead*)buf)->ackNum, cep->packetList);
+		}
 		
 		//check if finish sending the whole chunk
 		if( cep->bytesRead == chunkSize ){
@@ -192,8 +209,8 @@ void process_inbound_udp(int sock) {
 		void* packet = nextDataPacket(cep->masterfp, seqToSend , sizeToRead);
 		node* newNode = initNode(packet);
 		addList(newNode, &(cep->packetList));
-		//spiffy_sendto(sock, packet, ((packetHead* )packet)->packLen, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
-		sendto(sock, packet, ((packetHead* )packet)->packLen, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
+		spiffy_sendto(sock, packet, ((packetHead* )packet)->packLen, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
+		//sendto(sock, packet, ((packetHead* )packet)->packLen, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
 		cep->lastSent = newNode;
 		cep->bytesRead += sizeToRead;
 		printf("Bytes read: %d\n", cep->bytesRead);
@@ -230,8 +247,8 @@ void process_get(char *chunkfile, char *outputfile) {
 	      peerEle* thisPeer = (peerEle*)itr->data;
 	 		if( thisPeer->id != myId ){
 				printf("Send packet to peer %d @  %s:%d\n", thisPeer->id, inet_ntoa(thisPeer->cli_addr.sin_addr) ,ntohs(thisPeer->cli_addr.sin_port));
-		  		//spiffy_sendto(sock, whohasp, bufSize, 0, (struct sockaddr *) &thisPeer->cli_addr, sizeof(thisPeer->cli_addr));
-				sendto(sock, whohasp, bufSize, 0, (struct sockaddr *) &thisPeer->cli_addr, sizeof(thisPeer->cli_addr));
+		  		spiffy_sendto(sock, whohasp, bufSize, 0, (struct sockaddr *) &thisPeer->cli_addr, sizeof(thisPeer->cli_addr));
+				//sendto(sock, whohasp, bufSize, 0, (struct sockaddr *) &thisPeer->cli_addr, sizeof(thisPeer->cli_addr));
 	  		}
 			itr = itr->nextp;
 		}

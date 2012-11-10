@@ -13,6 +13,7 @@ typedef struct cE{
 	node* lastAcked;
 	FILE* masterfp;
 	int windowSize;
+	int lastAckedCount;
 	
 	// receiver side fields
 	unsigned int nextExpectedSeq;
@@ -41,3 +42,4 @@ node* resolveLastPacketAcked(unsigned int target, linkedList packetList);
 void sendPendingGetRequest(linkedList* chunkList, int sock);
 int writeChunkToFile(FILE* outfile, linkedList* packetList);
 int buildOuputFile(FILE* outfile, linkedList* chunkList);
+void findMex(chunkEle* cep);

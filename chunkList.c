@@ -18,6 +18,7 @@ chunkEle* initChunkEle(unsigned int id, char hash[sizeofHash]){
 	ele->packetList.length = 0;
 	ele->bytesRead = 0;
 	ele->inProgress = 0;
+	ele->lastAckedCount = 0;
 	return ele;
 }
 
@@ -135,8 +136,8 @@ void AddResponses(peerEle* thisPeer, char* buf, linkedList* chunkList, int sock)
 				thisChunk->fromThisPeer->inUse = 1; 
 				void* getPack = getCons(thisChunk->chunkHash);
 				printf("Send GET request to peer %d @  %s:%d\n", thisPeer->id, inet_ntoa(thisPeer->cli_addr.sin_addr) ,ntohs(thisPeer->cli_addr.sin_port));
-				//spiffy_sendto(sock, getPack, sizeofGetPacket, 0, (struct sockaddr *) &thisPeer->cli_addr, sizeof(thisPeer->cli_addr));
-				sendto(sock, getPack, sizeofGetPacket, 0, (struct sockaddr *) &thisPeer->cli_addr, sizeof(thisPeer->cli_addr));
+				spiffy_sendto(sock, getPack, sizeofGetPacket, 0, (struct sockaddr *) &thisPeer->cli_addr, sizeof(thisPeer->cli_addr));
+				//sendto(sock, getPack, sizeofGetPacket, 0, (struct sockaddr *) &thisPeer->cli_addr, sizeof(thisPeer->cli_addr));
 		}
 		}
 		curr += sizeofHash;
@@ -154,8 +155,8 @@ void sendPendingGetRequest(linkedList* chunkList, int sock){
 			thisELe->inProgress = 1;
 			void* getPack = getCons(thisELe->chunkHash);
 			printf("Send GET request to peer %d @  %s:%d\n", thisELe->fromThisPeer->id, inet_ntoa(thisELe->fromThisPeer->cli_addr.sin_addr) ,ntohs(thisELe->fromThisPeer->cli_addr.sin_port));
-			//spiffy_sendto(sock, getPack, sizeofGetPacket, 0, (struct sockaddr *) &(thisELe->fromThisPeer->cli_addr), sizeof(thisELe->fromThisPeer->cli_addr));
-			sendto(sock, getPack, sizeofGetPacket, 0, (struct sockaddr *) &(thisELe->fromThisPeer->cli_addr), sizeof(thisELe->fromThisPeer->cli_addr));
+			spiffy_sendto(sock, getPack, sizeofGetPacket, 0, (struct sockaddr *) &(thisELe->fromThisPeer->cli_addr), sizeof(thisELe->fromThisPeer->cli_addr));
+			//sendto(sock, getPack, sizeofGetPacket, 0, (struct sockaddr *) &(thisELe->fromThisPeer->cli_addr), sizeof(thisELe->fromThisPeer->cli_addr));
 		}
 		
 		itr = itr->nextp;
@@ -308,6 +309,24 @@ int writeChunkToFile(FILE* outfile, linkedList* packetList){
 		itr = itr->nextp;
 	}while(itr != packetList->headp );
 	return sum;
+}
+
+void findMex(chunkEle* cep){
+	node* curp = cep->packetList.headp->nextp;
+	node* prevp = cep->packetList.headp;
+	
+	do{
+		int curNum = ((packetHead*)curp->data)->seqNum;
+		int prevNum = ((packetHead*)prevp->data)->seqNum;
+		if((curNum-prevNum) != 1){
+			cep->nextExpectedSeq = prevNum+1;
+			return;
+		}
+		prevp = curp;
+		curp = curp->nextp;
+	}while(curp != cep->packetList.headp->nextp);
+
+	return;
 }
 
 int buildOuputFile(FILE* outfile, linkedList* chunkList){
