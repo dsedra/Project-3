@@ -10,6 +10,7 @@ void addList(node* toAdd, linkedList* listp){
 	if(listp->headp == NULL){
 		toAdd->nextp = toAdd;
 		toAdd->prevp = toAdd;
+		listp->headp = toAdd;
 	}
 	else{
 		toAdd->nextp = listp->headp;
@@ -18,7 +19,6 @@ void addList(node* toAdd, linkedList* listp){
 		toAdd->prevp->nextp = toAdd;
 	}
 	
-	listp->headp = toAdd;
 	listp->length++;
 	return;
 }

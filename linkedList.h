@@ -32,10 +32,12 @@ typedef struct ph packetHead;
 
 typedef struct ps{
 	unsigned int id;
+	unsigned int rtt;
 	char host[60];
 	int port;
 	struct sockaddr_in cli_addr;
 	int inUse;
+
 }peerEle;
 
 void addList(node* toAdd, linkedList* listp);
