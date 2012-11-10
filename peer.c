@@ -20,6 +20,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <sys/time.h>
+#include <signal.h>
 #include "debug.h"
 #include "spiffy.h"
 #include "bt_parse.h"
@@ -36,6 +38,7 @@ linkedList haschunkList;
 linkedList windowSets;
 char masterDataFilePath[100];
 FILE* outputFile;
+time_t start;
 
 /* global udp socket */
 int sock;
@@ -89,6 +92,7 @@ void process_inbound_udp(int sock) {
 			unsigned int bufSize = ((packetHead *)ihavep)->packLen;
 			//spiffy_sendto(sock, ihavep, bufSize, 0, (struct sockaddr *) &from, fromlen);
 			sendto(sock, ihavep, bufSize, 0, (struct sockaddr *) &from, fromlen);
+			time(&start);
 		}
 		break;
 	}
@@ -99,9 +103,12 @@ void process_inbound_udp(int sock) {
 		memcpy(tmp, (buf+20), sizeofHash);
 		printf("chunk hash: %s\n", tmp);
 		peerEle* thisPeer = resolvePeer(from, peerList);
+		time_t finish;
+		time(&finish);
 		if( thisPeer == NULL ){
 			printf("RESOLVE FAILED\n");
 		}
+		thisPeer->rtt = difftime(finish, start);
 		AddResponses(thisPeer, buf, &chunkList, sock);
 		printChunkList(chunkList);
 		break;

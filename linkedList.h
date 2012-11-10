@@ -36,6 +36,7 @@ typedef struct ps{
 	int port;
 	struct sockaddr_in cli_addr;
 	int inUse;
+	unsigned int rtt;
 }peerEle;
 
 void addList(node* toAdd, linkedList* listp);
