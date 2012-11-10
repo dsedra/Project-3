@@ -130,8 +130,6 @@ void process_inbound_udp(int sock) {
 	case DATA:{
 		printf("Receive data packet %d, with size %d \n", ((packetHead *)buf)->seqNum, ((packetHead *)buf)->packLen - headerSize);
 		
-		//assert(((packetHead *)buf)->packLen - headerSize == 1484);
-		
 		unsigned int bufSize = ((packetHead *)buf)->packLen;
 		void* newBuf = malloc(bufSize);
 		memcpy(newBuf,buf,bufSize);
