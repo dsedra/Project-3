@@ -47,6 +47,9 @@ void peer_run(bt_config_t *config);
 void parsePeerFile(char* peerFile);
 void parseChunkFile(char* chunkfile, linkedList* list);
 void parseMasterChunkFile(char* masterChunkFile);
+void fillWindow(chunkEle* cep);
+void cleanList(chunkEle* cep);
+void sendWindow(chunkEle* cep, int sock);
 
 int main(int argc, char **argv) {
   bt_config_t config;
@@ -120,18 +123,21 @@ void process_inbound_udp(int sock) {
 		
 		chunkEle* thisWindow = buildNewWindow(&windowSets, &haschunkList, peer, masterDataFilePath, buf);
 		// here we try to send the full window of packets out
-		int i;
-		node* curr = thisWindow->packetList.headp->prevp;
+		//int i;
+		//node* curr = thisWindow->packetList.headp->prevp;
 		//node* curr = thisWindow->packetList.headp;
-		for( i = 0 ; i < thisWindow->windowSize ; i++){
-			void* packet = curr->data;
-			unsigned int bufSize = ((packetHead *)packet)->packLen;
-			spiffy_sendto(sock, packet, bufSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
+		//for( i = 0 ; i < thisWindow->windowSize ; i++){
+		//	void* packet = curr->data;
+		//	unsigned int bufSize = ((packetHead *)packet)->packLen;
+		//	spiffy_sendto(sock, packet, bufSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
 			//sendto(sock, packet, bufSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
-			thisWindow->lastSent = curr; 
-			curr = curr->prevp;
+		//	thisWindow->lastSent = curr; 
+		//	curr = curr->prevp;
 			//curr = curr->nextp;
-		}
+
+		// send first element, no need to clean or fill
+		sendWindow(thisWindow, sock);
+
 		break;
 	}
 	case DATA:{
@@ -174,6 +180,7 @@ void process_inbound_udp(int sock) {
 	}
 	case ACK:{
 		printf("Receive Ack %d\n", *(int*)(buf+12));
+
 		chunkEle* cep = resolveChunk(peer, windowSets);
 
 		if( (cep->lastAcked) && ((packetHead* )(cep->lastAcked->data))->seqNum == ((packetHead* )(buf))->ackNum ){
@@ -190,6 +197,7 @@ void process_inbound_udp(int sock) {
 
 		}else{
 			cep->lastAcked = resolveLastPacketAcked( ((packetHead*)buf)->ackNum, cep->packetList);
+			cleanList(cep);
 		}
 		
 		//check if finish sending the whole chunk
@@ -204,17 +212,12 @@ void process_inbound_udp(int sock) {
 			}
 			
 		}else{
-		int sizeToRead = min(chunkSize - cep->bytesRead , 1500-headerSize);
-		unsigned int seqToSend = ((packetHead* )cep->lastSent->data)->seqNum + 1;
-		void* packet = nextDataPacket(cep->masterfp, seqToSend , sizeToRead);
-		node* newNode = initNode(packet);
-		addList(newNode, &(cep->packetList));
-		spiffy_sendto(sock, packet, ((packetHead* )packet)->packLen, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
-		//sendto(sock, packet, ((packetHead* )packet)->packLen, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
-		cep->lastSent = newNode;
-		cep->bytesRead += sizeToRead;
-		printf("Bytes read: %d\n", cep->bytesRead);
+			cleanList(cep);
+			fillWindow(cep);
+			sendWindow(cep, sock);
 		}
+
+		printPacketList(cep->packetList);
 		break;
 	}
 	
@@ -372,6 +375,68 @@ void parsePeerFile(char* peerFile){
 	fclose(fp);
 	return;
 }
+
+/* remove old elements up to last acked */
+void cleanList(chunkEle* cep){
+	node* itr = cep->packetList.headp->prevp;
+
+	if(cep->lastAcked == NULL)
+		return;
+
+
+	while(cep->packetList.length > 0){
+		if(itr == cep->lastAcked)
+			return;
+		remList(itr, &cep->packetList);
+		itr = itr->prevp;
+	}
+
+	return;
+}
+
+/* make sure packelist is  window size or EOF */
+void fillWindow(chunkEle* cep){
+	int sizeToRead;
+	unsigned int seqToSend; 
+	int i;
+
+	for(i = cep->packetList.length; ((i < cep->windowSize) && (cep->bytesRead != chunkSize)); i++){
+		sizeToRead = min(chunkSize - cep->bytesRead , 1500-headerSize);
+		seqToSend = ((packetHead* )cep->packetList.headp->data)->seqNum + 1;
+		void* packet = nextDataPacket(cep->masterfp, seqToSend , sizeToRead);
+		node* newNode = initNode(packet);
+		addList(newNode,&cep->packetList);
+	}
+}
+
+/* send packets until window is maxed out */
+void sendWindow(chunkEle* cep, int sock){
+
+	// no acks yet, send single packet window
+	if( cep->lastAcked == NULL ){
+		void* packet = cep->packetList.headp->data;
+		unsigned int bufSize = ((packetHead *)packet)->packLen;
+
+		spiffy_sendto(sock, packet, bufSize, 0, (struct sockaddr *) &cep->fromThisPeer->cli_addr, sizeof(cep->fromThisPeer->cli_addr));
+		//sendto(sock, packet, bufSize, 0, (struct sockaddr *) &cep->fromThisPeer->cli_addr, sizeof(cep->fromThisPeer->cli_addr));		
+	
+		cep->lastSent = cep->packetList.headp;
+		return;
+	}
+
+	//while window isn't exhausted
+	while( ( ((packetHead*)cep->lastSent->data)->seqNum - ((packetHead*)cep->lastAcked->data)->seqNum ) < cep->packetList.length - 1 ){
+		cep->lastSent = cep->lastSent->prevp; 
+		void* packet = cep->lastSent->data;
+		unsigned int bufSize = ((packetHead *)packet)->packLen;
+
+		spiffy_sendto(sock, packet, bufSize, 0, (struct sockaddr *) &cep->fromThisPeer->cli_addr, sizeof(cep->fromThisPeer->cli_addr));
+		//sendto(sock, packet, bufSize, 0, (struct sockaddr *) &cep->fromThisPeer->cli_addr, sizeof(cep->fromThisPeer->cli_addr));
+	}
+
+	return;
+}
+
 
 void parseChunkFile(char* chunkfile, linkedList* list){
 	FILE* fp;

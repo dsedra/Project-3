@@ -282,6 +282,7 @@ chunkEle* buildNewWindow(linkedList* windowSets, linkedList* hasChunkList, peerE
 	thisWindow->windowSize = fixedWindowSize;
 	thisWindow->lastSent = NULL;
 	thisWindow->lastAcked = NULL;
+
 	thisWindow->inProgress = 1;
 	if((fp = fopen(masterDataFilePath, "r")) == NULL){
 		fprintf(stderr,"Error opening %s",masterDataFilePath);
@@ -290,14 +291,17 @@ chunkEle* buildNewWindow(linkedList* windowSets, linkedList* hasChunkList, peerE
 	// need to lookup master data file
 	long offset = thisWindow->chunkId * chunkSize;
 	int size = 1500 - headerSize;
-	int seq; 
+	int seq = 1; 
 	fseek(fp, offset, SEEK_SET);
-	for( seq = 1; seq <= fixedWindowSize; seq ++ ){
-		void* thisPacket = nextDataPacket(fp, seq, size);
-		thisWindow->bytesRead += size;
-		node* newNode = initNode(thisPacket);
-		addList(newNode, &(thisWindow->packetList));
-	}
+
+	/* add 1 packet to list, per slow start spec */
+	void* thisPacket = nextDataPacket(fp, seq, size);
+	thisWindow->bytesRead += size;
+	node* newNode = initNode(thisPacket);
+	addList(newNode, &(thisWindow->packetList));
+
+
+
 	thisWindow->masterfp = fp;
 	node* wNode = initNode(thisWindow);
 	addList(wNode, windowSets);
