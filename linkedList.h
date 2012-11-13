@@ -16,7 +16,7 @@ typedef struct n{
 typedef struct ll{
 	node* headp;
 	unsigned int length;
-	int finished;
+	int finished; // number of things finished out of length
 }linkedList;
 
 
@@ -36,7 +36,7 @@ typedef struct ps{
 	int port;
 	struct sockaddr_in cli_addr;
 	int inUse;
-	unsigned int rtt;
+	double rtt;
 }peerEle;
 
 void addList(node* toAdd, linkedList* listp);

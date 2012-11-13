@@ -8,6 +8,7 @@
 #include <netinet/ip.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <sys/time.h>
 #include "spiffy.h"
 
 chunkEle* initChunkEle(unsigned int id, char hash[sizeofHash]){
@@ -194,7 +195,9 @@ void orderedAdd(chunkEle* cep, void* buf){
 			unsigned int currSeq = ((packetHead* )curp->data)->seqNum;
 			unsigned int prevSeq = ((packetHead* )curp->prevp->data)->seqNum;
 			//printf("curr:%d, target:%d\n",currSeq, target);
-			if( target < currSeq ){
+			if(target == currSeq)
+				return;
+			else if( target < currSeq ){
 				if( target > prevSeq){
 				cep->bytesRead += contentLength;
 				newNode->nextp = curp;
@@ -282,6 +285,7 @@ chunkEle* buildNewWindow(linkedList* windowSets, linkedList* hasChunkList, peerE
 	thisWindow->windowSize = fixedWindowSize;
 	thisWindow->lastSent = NULL;
 	thisWindow->lastAcked = NULL;
+	time(&thisWindow->afterLastAckedTime);
 
 	thisWindow->inProgress = 1;
 	if((fp = fopen(masterDataFilePath, "r")) == NULL){

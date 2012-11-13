@@ -31,6 +31,7 @@
 #include "chunkList.h"
 
 #define min(a,b) ((a<=b)?a:b)
+#define timeout 3
 
 linkedList chunkList;
 linkedList peerList;
@@ -50,6 +51,10 @@ void parseMasterChunkFile(char* masterChunkFile);
 void fillWindow(chunkEle* cep);
 void cleanList(chunkEle* cep);
 void sendWindow(chunkEle* cep, int sock);
+void alarmHandler(int sig);
+void exitFunc();
+void sendAfterLastAcked(chunkEle* cep);
+
 
 int main(int argc, char **argv) {
   bt_config_t config;
@@ -57,6 +62,18 @@ int main(int argc, char **argv) {
   bt_init(&config, argc, argv);
 
   DPRINTF(DEBUG_INIT, "peer.c main beginning\n");
+
+
+  struct itimerval tout_val;
+  
+  tout_val.it_interval.tv_sec = 0;
+  tout_val.it_interval.tv_usec = 0;
+  tout_val.it_value.tv_sec = 0; 
+  tout_val.it_value.tv_usec = 100000; // 100 ms
+  setitimer(ITIMER_REAL, &tout_val,0);
+
+  signal(SIGALRM,alarmHandler); /* set the Alarm signal capture */
+  signal(SIGINT,exitFunc);
 
 #ifdef TESTING
   config.identity = 1; // your group number here
@@ -87,6 +104,8 @@ void process_inbound_udp(int sock) {
 	//recvfrom(sock, buf, BUFLEN, 0, (struct sockaddr *) &from, &fromlen);
   packetHead* pHead = (packetHead* )buf;
   peerEle* peer = resolvePeer(from, peerList);
+
+  
   switch(pHead->type){
 	case WHOHAS:{
 		printf("Recieve WHOHAS request\n");
@@ -198,6 +217,7 @@ void process_inbound_udp(int sock) {
 		}else{
 			cep->lastAcked = resolveLastPacketAcked( ((packetHead*)buf)->ackNum, cep->packetList);
 			cleanList(cep);
+			time(&cep->afterLastAckedTime);
 		}
 		
 		//check if finish sending the whole chunk
@@ -403,6 +423,7 @@ void fillWindow(chunkEle* cep){
 	for(i = cep->packetList.length; ((i < cep->windowSize) && (cep->bytesRead != chunkSize)); i++){
 		sizeToRead = min(chunkSize - cep->bytesRead , 1500-headerSize);
 		seqToSend = ((packetHead* )cep->packetList.headp->data)->seqNum + 1;
+		cep->bytesRead += sizeToRead;
 		void* packet = nextDataPacket(cep->masterfp, seqToSend , sizeToRead);
 		node* newNode = initNode(packet);
 		addList(newNode,&cep->packetList);
@@ -462,6 +483,75 @@ void parseChunkFile(char* chunkfile, linkedList* list){
 		addList(newNode, list);
 	}
 	fclose(fp);
+}
+
+
+/* re-send everything from last acked to last sent */
+void alarmHandler(int sig){
+	struct itimerval tout_val;
+	node* curWindow;
+	int i;
+	time_t curTime;
+	double dif;
+
+  	signal(SIGALRM,alarmHandler);
+   
+   	tout_val.it_interval.tv_sec = 0;
+   	tout_val.it_interval.tv_usec = 0;
+   	tout_val.it_value.tv_sec = 0; 
+   	tout_val.it_value.tv_usec = 100000; // 100 ms
+
+   	curWindow = windowSets.headp;
+
+   	//traverse windowSets
+	for(i = 0; i < windowSets.length; i++){
+		chunkEle* cep = (chunkEle*) curWindow->data;
+		time(&curTime);
+		dif = difftime(curTime,cep->afterLastAckedTime);
+
+		if(dif >= timeout){
+			sendAfterLastAcked(cep);
+			time(&cep->afterLastAckedTime);
+		}
+
+		curWindow = curWindow->prevp;
+	}   
+
+   	setitimer(ITIMER_REAL, &tout_val,0);
+ 	setitimer(ITIMER_REAL, &tout_val,0);
+
+ 	return;
+}
+
+void sendAfterLastAcked(chunkEle* cep){
+	node* cur;
+
+	if(cep->lastSent == NULL)
+		return;
+
+	//last acked is head if nothing acked yet
+	if(cep->lastAcked == NULL)
+		cur = cep->packetList.headp;
+	else 
+		cur = cep->lastAcked->prevp;
+
+	do{
+		void* packet = cur->data;
+		unsigned int bufSize = ((packetHead *)packet)->packLen;
+
+		spiffy_sendto(sock, packet, bufSize, 0, (struct sockaddr *) &cep->fromThisPeer->cli_addr, sizeof(cep->fromThisPeer->cli_addr));
+		//sendto(sock, ihavep, bufSize, 0, (struct sockaddr *) &from, fromlen);
+		cur = cur->prevp;
+	}while(cur != cep->lastSent->prevp);
+
+	return;
+}
+
+/* handle ^C */
+void exitFunc(){
+	signal(SIGINT,exitFunc);
+    printf("\nBye Bye!!!\n");
+    exit(0);
 }
 
 void parseMasterChunkFile(char* masterChunkFile){

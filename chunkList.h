@@ -1,6 +1,7 @@
 #include "linkedList.h"
 #include "packet.h"
 #include <stdio.h>
+#include <sys/time.h>
 
 typedef struct cE{
 	unsigned int chunkId;
@@ -14,6 +15,7 @@ typedef struct cE{
 	FILE* masterfp;
 	int windowSize;
 	int lastAckedCount;
+	time_t afterLastAckedTime; // last time that lasted
 	
 	// receiver side fields
 	unsigned int nextExpectedSeq;
