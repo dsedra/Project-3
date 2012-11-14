@@ -40,7 +40,7 @@ void* nextDataPacket(FILE* fp, int seq, int size);
 chunkEle* buildNewWindow(linkedList* windowSets, linkedList* hasChunkList, peerEle* peer, char* masterDataFilePath, char* buf);
 void orderedAdd(chunkEle* cep, void* buf);
 chunkEle* resolveChunk(peerEle* peerp, linkedList list);
-node* resolveLastPacketAcked(unsigned int target, linkedList packetList);
+node* resolveLastPacketAcked(unsigned int target, chunkEle* cep);
 void sendPendingGetRequest(linkedList* chunkList, int sock);
 int writeChunkToFile(FILE* outfile, linkedList* packetList);
 int buildOuputFile(FILE* outfile, linkedList* chunkList);

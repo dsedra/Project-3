@@ -230,25 +230,32 @@ void orderedAdd(chunkEle* cep, void* buf){
 
 chunkEle* resolveChunk(peerEle* peerp, linkedList list){
 	node* curp = list.headp;
+	chunkEle* finished;
+	
 	do{
 		chunkEle* thisEle = (chunkEle*)(curp->data);
-		if(thisEle->fromThisPeer == peerp && thisEle->inProgress == 1)
+		if(thisEle->fromThisPeer == peerp && thisEle->inProgress == 1){
 			return thisEle;
+		}
+		else if( thisEle->fromThisPeer == peerp && !thisEle->inProgress && thisEle->packetList.length != 0){
+			finished = thisEle;
+		}
 		curp = curp->nextp;
 	}while(curp != list.headp);
-	return NULL;
+	
+	return finished;
 }
 
-node* resolveLastPacketAcked(unsigned int target, linkedList packetList){
-	node* curp = packetList.headp;
+node* resolveLastPacketAcked(unsigned int target, chunkEle* cep){	
+	node* curp = cep->packetList.headp;
 	do{
 		unsigned int seq = ((packetHead*)curp->data)->seqNum;
 		if( target == seq ){
-			printf("Resolve last ack as %d\n", target);
+			printf("***Resolve last ack as %d\n", target);
 			return curp;
 		}	
 		curp = curp->nextp;
-	}while(curp != packetList.headp);
+	}while(curp != cep->packetList.headp);
 	return NULL;
 }
 

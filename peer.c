@@ -160,6 +160,7 @@ void process_inbound_udp(int sock) {
 		break;
 	}
 	case DATA:{
+		
 		printf("Receive data packet %d, with size %d \n", ((packetHead *)buf)->seqNum, ((packetHead *)buf)->packLen - headerSize);
 		
 		unsigned int bufSize = ((packetHead *)buf)->packLen;
@@ -178,10 +179,13 @@ void process_inbound_udp(int sock) {
 		printf("bytes read for hash %s : %d\n",cep->chunkHash, cep->bytesRead);
 		//check if finish receiving the whole chunk
 		if(cep->bytesRead == chunkSize ){
+			if ( cep->fromThisPeer->inUse == 1){
 			printf("Sucessfully receive the chunk %s\n", cep->chunkHash);
 			chunkList.finished ++;
 			cep->fromThisPeer->inUse = 0;
 			cep->inProgress = 0;
+			}
+			printf("FINISHED %d\n", chunkList.finished);
 			if(chunkList.finished == chunkList.length){
 				printf("Finish receiving the whole file\n");
 				// merge the chunks and write to the corresponding output file
@@ -198,10 +202,11 @@ void process_inbound_udp(int sock) {
 		break;
 	}
 	case ACK:{
-		printf("Receive Ack %d\n", *(int*)(buf+12));
-
 		chunkEle* cep = resolveChunk(peer, windowSets);
-
+		if ( cep->inProgress == 0){
+			break;
+		}
+		printf("Receive Ack %d\n", *(int*)(buf+12));
 		if( (cep->lastAcked) && ((packetHead* )(cep->lastAcked->data))->seqNum == ((packetHead* )(buf))->ackNum ){
 			cep->lastAckedCount ++;
 			printf("Incrementing last ack counter for %d to %d\n", ((packetHead* )(buf))->ackNum,cep->lastAckedCount);
@@ -215,7 +220,7 @@ void process_inbound_udp(int sock) {
 			}
 
 		}else{
-			cep->lastAcked = resolveLastPacketAcked( ((packetHead*)buf)->ackNum, cep->packetList);
+			cep->lastAcked = resolveLastPacketAcked( ((packetHead*)buf)->ackNum, cep);
 			cleanList(cep);
 			time(&cep->afterLastAckedTime);
 		}
@@ -505,7 +510,10 @@ void alarmHandler(int sig){
 
    	//traverse windowSets
 	for(i = 0; i < windowSets.length; i++){
+	
 		chunkEle* cep = (chunkEle*) curWindow->data;
+	// which means not all packets have been acked yet	
+	if(cep->inProgress == 1){
 		time(&curTime);
 		dif = difftime(curTime,cep->afterLastAckedTime);
 
@@ -513,7 +521,7 @@ void alarmHandler(int sig){
 			sendAfterLastAcked(cep);
 			time(&cep->afterLastAckedTime);
 		}
-
+	}
 		curWindow = curWindow->prevp;
 	}   
 
@@ -538,7 +546,7 @@ void sendAfterLastAcked(chunkEle* cep){
 	do{
 		void* packet = cur->data;
 		unsigned int bufSize = ((packetHead *)packet)->packLen;
-
+		printf("***Timeout, retrans packet %d\n to peer %d***\n", ((packetHead* )packet)->seqNum, cep->fromThisPeer->id );
 		spiffy_sendto(sock, packet, bufSize, 0, (struct sockaddr *) &cep->fromThisPeer->cli_addr, sizeof(cep->fromThisPeer->cli_addr));
 		//sendto(sock, ihavep, bufSize, 0, (struct sockaddr *) &from, fromlen);
 		cur = cur->prevp;
