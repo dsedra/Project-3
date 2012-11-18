@@ -3,8 +3,12 @@
 #define numChunks 4 /* 1 byte for num chunks, rest padding */
 #define sizeofHash 40
 #define chunkSize (512*1024)
-#define fixedWindowSize 8
+//#define fixedWindowSize 8
 #define sizeofGetPacket (headerSize + numChunks + sizeofHash)
+#define halve(a) (a=(max((a/2),2)))
+#define min(a,b) ((a<=b)?a:b)
+#define max(a,b) ((a>=b)?a:b)
+#define timeout 3
 
 #define WHOHAS 0
 #define IHAVE 1

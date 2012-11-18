@@ -16,6 +16,10 @@ typedef struct cE{
 	int windowSize;
 	int lastAckedCount;
 	time_t afterLastAckedTime; // last time that lasted
+	time_t timeInRTT; // goes off every rtt for congestion avoidance
+	time_t sinceStart; // time since start
+	int ssthresh;
+	int hasRecvRTT;// 1 if received ack in last rtt, 0 else
 	
 	// receiver side fields
 	unsigned int nextExpectedSeq;

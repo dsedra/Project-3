@@ -30,9 +30,6 @@
 #include "packet.h"
 #include "chunkList.h"
 
-#define min(a,b) ((a<=b)?a:b)
-#define timeout 3
-
 linkedList chunkList;
 linkedList peerList;
 linkedList haschunkList;
@@ -44,6 +41,7 @@ time_t start;
 /* global udp socket */
 int sock;
 int myId;
+FILE* graphFile;
 void peer_run(bt_config_t *config);
 void parsePeerFile(char* peerFile);
 void parseChunkFile(char* chunkfile, linkedList* list);
@@ -58,6 +56,11 @@ void sendAfterLastAcked(chunkEle* cep);
 
 int main(int argc, char **argv) {
   bt_config_t config;
+
+  if((graphFile = fopen("allgraph.txt", "w")) == NULL){
+		printf("Problem opening graph file\n");
+		exit(1);
+	}
 
   bt_init(&config, argc, argv);
 
@@ -207,6 +210,19 @@ void process_inbound_udp(int sock) {
 			break;
 		}
 		printf("Receive Ack %d\n", *(int*)(buf+12));
+
+		if(cep && (cep->windowSize < cep->ssthresh)){
+			time_t cur;
+			time(&cur);
+			cep->windowSize++;
+			
+			double dif = difftime(cur,cep->sinceStart);
+			fprintf(graphFile,"s%d\t%f\t%d\n",cep->chunkId,dif,cep->windowSize);
+		}
+		else if(cep && (cep->windowSize == cep->ssthresh))
+			cep->hasRecvRTT = 1;
+
+
 		if( (cep->lastAcked) && ((packetHead* )(cep->lastAcked->data))->seqNum == ((packetHead* )(buf))->ackNum ){
 			cep->lastAckedCount ++;
 			printf("Incrementing last ack counter for %d to %d\n", ((packetHead* )(buf))->ackNum,cep->lastAckedCount);
@@ -216,6 +232,11 @@ void process_inbound_udp(int sock) {
 				node* retry = cep->lastAcked->prevp;
 				printf("Retramsmit packet %d\n", ((packetHead* )retry->data)->seqNum);
 				spiffy_sendto(sock, retry->data, ((packetHead* )retry->data)->packLen, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
+				
+				printf("******* window: %d halving thresh from %d",cep->windowSize,cep->ssthresh);
+				halve(cep->ssthresh);
+				cep->windowSize = 1;
+				printf(" to %d\n",cep->ssthresh);
 				break;
 			}
 
@@ -451,7 +472,7 @@ void sendWindow(chunkEle* cep, int sock){
 	}
 
 	//while window isn't exhausted
-	while( ( ((packetHead*)cep->lastSent->data)->seqNum - ((packetHead*)cep->lastAcked->data)->seqNum ) < cep->packetList.length - 1 ){
+	while( ( ((packetHead*)cep->lastSent->data)->seqNum - ((packetHead*)cep->lastAcked->data)->seqNum ) < cep->windowSize ){
 		cep->lastSent = cep->lastSent->prevp; 
 		void* packet = cep->lastSent->data;
 		unsigned int bufSize = ((packetHead *)packet)->packLen;
@@ -512,16 +533,34 @@ void alarmHandler(int sig){
 	for(i = 0; i < windowSets.length; i++){
 	
 		chunkEle* cep = (chunkEle*) curWindow->data;
-	// which means not all packets have been acked yet	
-	if(cep->inProgress == 1){
-		time(&curTime);
-		dif = difftime(curTime,cep->afterLastAckedTime);
+		// which means not all packets have been acked yet	
+		if(cep->inProgress == 1){
+			time(&curTime);
+			dif = difftime(curTime,cep->afterLastAckedTime);
 
-		if(dif >= timeout){
-			sendAfterLastAcked(cep);
-			time(&cep->afterLastAckedTime);
+			if(dif >= timeout){
+				sendAfterLastAcked(cep);
+				time(&cep->afterLastAckedTime);
+				printf("******* halving window from %d",cep->ssthresh);
+				halve(cep->ssthresh);
+				cep->windowSize = 1;
+				printf(" to %d\n",cep->ssthresh);
+			}
+
+			dif = difftime(curTime,cep->timeInRTT);
+
+			if(dif >= cep->fromThisPeer->rtt){
+				if(cep->hasRecvRTT == 1){
+					printf("Inrement window size in avoid-period\n");
+					cep->windowSize++;
+					double start = difftime(curTime,cep->sinceStart);
+					fprintf(graphFile,"s%d\t%f\t%d\n",cep->chunkId,start,cep->windowSize);
+					cep->hasRecvRTT = 0;
+				}
+
+				time(&cep->timeInRTT); // reset rtt timer
+			}
 		}
-	}
 		curWindow = curWindow->prevp;
 	}   
 
@@ -550,7 +589,7 @@ void sendAfterLastAcked(chunkEle* cep){
 		spiffy_sendto(sock, packet, bufSize, 0, (struct sockaddr *) &cep->fromThisPeer->cli_addr, sizeof(cep->fromThisPeer->cli_addr));
 		//sendto(sock, ihavep, bufSize, 0, (struct sockaddr *) &from, fromlen);
 		cur = cur->prevp;
-	}while(cur != cep->lastSent->prevp);
+	}while(cur != cep->lastSent->prevp);	
 
 	return;
 }
