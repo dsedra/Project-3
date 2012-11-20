@@ -289,14 +289,10 @@ chunkEle* buildNewWindow(linkedList* windowSets, linkedList* hasChunkList, peerE
 	chunkEle* thisWindow = initChunkEle( thisChunk->chunkId, thisChunk->chunkHash);
 	thisWindow->fromThisPeer = peer;
 	thisWindow->bytesRead = 0;
-	thisWindow->windowSize = 1;
+	thisWindow->windowSize = fixedWindowSize;
 	thisWindow->lastSent = NULL;
 	thisWindow->lastAcked = NULL;
 	time(&thisWindow->afterLastAckedTime);
-	time(&thisWindow->timeInRTT);
-	time(&thisWindow->sinceStart);
-	thisWindow->ssthresh = 64; 
-	thisWindow->hasRecvRTT = 0;
 
 	thisWindow->inProgress = 1;
 	if((fp = fopen(masterDataFilePath, "r")) == NULL){
