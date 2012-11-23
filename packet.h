@@ -5,6 +5,9 @@
 #define chunkSize (512*1024)
 #define fixedWindowSize 8
 #define sizeofGetPacket (headerSize + numChunks + sizeofHash)
+#define min(a,b) ((a<=b)?a:b)
+#define max(a,b) ((a>=b)?a:b)
+#define halve(a) (max((a/2),2))
 
 #define WHOHAS 0
 #define IHAVE 1
@@ -16,6 +19,9 @@
 #define MAGICNUM 15441
 #define VERSION 1
 #define MAXCHUNKS 74/* max chunks per packet */
+
+#define SLOWSTART 6
+#define CONGAVOID 7
 
 
 void* whohasCons(linkedList* listp, unsigned int start);

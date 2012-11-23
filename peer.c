@@ -30,7 +30,7 @@
 #include "packet.h"
 #include "chunkList.h"
 
-#define min(a,b) ((a<=b)?a:b)
+
 #define timeout 3
 
 linkedList chunkList;
@@ -160,15 +160,20 @@ void process_inbound_udp(int sock) {
 		break;
 	}
 	case DATA:{
-		
-		printf("Receive data packet %d, with size %d \n", ((packetHead *)buf)->seqNum, ((packetHead *)buf)->packLen - headerSize);
-		
 		unsigned int bufSize = ((packetHead *)buf)->packLen;
 		void* newBuf = malloc(bufSize);
 		memcpy(newBuf,buf,bufSize);
 		chunkEle* cep = resolveChunk(peer, chunkList);
 		orderedAdd(cep,newBuf);
-		
+
+		// reject packets from finished chunk
+		if(cep && (cep->chunkId != ((packetHead*)buf)->ackNum)){
+			printf("Wrong chunk!\n");
+			break;
+		}
+
+		printf("Receive data packet %d, with size %d \n", ((packetHead *)buf)->seqNum, ((packetHead *)buf)->packLen - headerSize);
+
 		findMex(cep);
 		printPacketList(cep->packetList);
 		void* packet = ackCons(cep->nextExpectedSeq - 1);
@@ -206,11 +211,21 @@ void process_inbound_udp(int sock) {
 		if ( cep->inProgress == 0){
 			break;
 		}
+
+
+		//check which wether SLOWSTART or CONGAVOID
+		if(cep->mode == SLOWSTART)
+			cep->windowSize++;
+
 		printf("Receive Ack %d\n", *(int*)(buf+12));
 		if( (cep->lastAcked) && ((packetHead* )(cep->lastAcked->data))->seqNum == ((packetHead* )(buf))->ackNum ){
 			cep->lastAckedCount ++;
 			printf("Incrementing last ack counter for %d to %d\n", ((packetHead* )(buf))->ackNum,cep->lastAckedCount);
 			if( cep->lastAckedCount  == 3 ){
+				//cut ssthresh in half and set window 1
+				cep->ssthresh = halve(cep->ssthresh);
+				cep->windowSize = 1;
+
 				//try retrasmit
 				cep->lastAckedCount = 0;
 				node* retry = cep->lastAcked->prevp;
@@ -429,7 +444,7 @@ void fillWindow(chunkEle* cep){
 		sizeToRead = min(chunkSize - cep->bytesRead , 1500-headerSize);
 		seqToSend = ((packetHead* )cep->packetList.headp->data)->seqNum + 1;
 		cep->bytesRead += sizeToRead;
-		void* packet = nextDataPacket(cep->masterfp, seqToSend , sizeToRead);
+		void* packet = nextDataPacket(cep->masterfp, seqToSend , sizeToRead, cep->chunkId);
 		node* newNode = initNode(packet);
 		addList(newNode,&cep->packetList);
 	}
@@ -520,6 +535,10 @@ void alarmHandler(int sig){
 		if(dif >= timeout){
 			sendAfterLastAcked(cep);
 			time(&cep->afterLastAckedTime);
+
+			//cut ssthresh in half and set window 1
+			cep->ssthresh = halve(cep->ssthresh);
+			cep->windowSize = 1;
 		}
 	}
 		curWindow = curWindow->prevp;

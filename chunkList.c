@@ -261,7 +261,7 @@ node* resolveLastPacketAcked(unsigned int target, chunkEle* cep){
 
 
 // return the next data packet based on offset, size need to read and seq
-void* nextDataPacket(FILE* fp, int seq, int size){
+void* nextDataPacket(FILE* fp, int seq, int size, int chunkId){
 	//fseek(fp, offset, SEEK_SET);
 	void* packet = malloc(headerSize + size);
 	packetHead* pHp = (packetHead*) packet;
@@ -271,7 +271,7 @@ void* nextDataPacket(FILE* fp, int seq, int size){
 	pHp->headerLen = headerSize;
 	pHp->packLen = headerSize +size;
 	pHp->seqNum = seq;
-	pHp->ackNum = 0;
+	pHp->ackNum = chunkId; // use to multiplex packets
 	void* packetPtr = packet + headerSize; // beginning of chunk data
 	fread(packetPtr, size, 1, fp);
 	return packet;
@@ -289,9 +289,11 @@ chunkEle* buildNewWindow(linkedList* windowSets, linkedList* hasChunkList, peerE
 	chunkEle* thisWindow = initChunkEle( thisChunk->chunkId, thisChunk->chunkHash);
 	thisWindow->fromThisPeer = peer;
 	thisWindow->bytesRead = 0;
-	thisWindow->windowSize = fixedWindowSize;
+	thisWindow->windowSize = 1; // slow start
 	thisWindow->lastSent = NULL;
 	thisWindow->lastAcked = NULL;
+	thisWindow->mode = SLOWSTART;
+	thisWindow->ssthresh = 64;
 	time(&thisWindow->afterLastAckedTime);
 
 	thisWindow->inProgress = 1;
@@ -306,12 +308,10 @@ chunkEle* buildNewWindow(linkedList* windowSets, linkedList* hasChunkList, peerE
 	fseek(fp, offset, SEEK_SET);
 
 	/* add 1 packet to list, per slow start spec */
-	void* thisPacket = nextDataPacket(fp, seq, size);
+	void* thisPacket = nextDataPacket(fp, seq, size, thisWindow->chunkId);
 	thisWindow->bytesRead += size;
 	node* newNode = initNode(thisPacket);
 	addList(newNode, &(thisWindow->packetList));
-
-
 
 	thisWindow->masterfp = fp;
 	node* wNode = initNode(thisWindow);

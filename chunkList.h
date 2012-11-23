@@ -16,7 +16,9 @@ typedef struct cE{
 	int windowSize;
 	int lastAckedCount;
 	time_t afterLastAckedTime; // last time that lasted
-	
+	int mode;
+	int ssthresh;
+
 	// receiver side fields
 	unsigned int nextExpectedSeq;
 	
@@ -36,7 +38,7 @@ chunkEle* lookupChunkHash(char target[sizeofHash], linkedList* cList);
 peerEle* resolvePeer( struct sockaddr_in from, linkedList pList);
 void AddResponses(peerEle* thisPeer, char* buf, linkedList* chunkList, int sock);
 void printPeerList(linkedList pList);
-void* nextDataPacket(FILE* fp, int seq, int size);
+void* nextDataPacket(FILE* fp, int seq, int size, int chunkId);
 chunkEle* buildNewWindow(linkedList* windowSets, linkedList* hasChunkList, peerEle* peer, char* masterDataFilePath, char* buf);
 void orderedAdd(chunkEle* cep, void* buf);
 chunkEle* resolveChunk(peerEle* peerp, linkedList list);
