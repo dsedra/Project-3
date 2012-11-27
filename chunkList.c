@@ -369,7 +369,11 @@ void findMex(chunkEle* cep){
 void cleanChunk(chunkEle* chunk){
 	printf("before close\n");
 	close(chunk->masterfp);
-	printf("after close\n");
+	
+	if(chunk->fromThisPeer != NULL){
+		chunk->fromThisPeer->inUse = 0;
+	}
+	
 	while(chunk->packetList.headp != NULL){
 		node* temp = chunk->packetList.headp;
 		remList(chunk->packetList.headp, &(chunk->packetList));
