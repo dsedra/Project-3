@@ -40,9 +40,12 @@ void remList(node* toRem, linkedList* listp){
 				listp->headp = toRem->nextp;
 
 			listp->length--;
+			break;
 		}
 		
 		itr = itr->nextp;
+		printf("We finally get stuck\n");
+		fflush(stdout);
 	}while(itr != listp->headp);
 	
 	return;

@@ -310,7 +310,7 @@ void process_get(char *chunkfile, char *outputfile) {
 	parseChunkFile(chunkfile, &chunkList);
 	printChunkList(chunkList);
 	
-	strcpy(outputFilePath,outputfile,strlen(outputfile));
+	strcpy(outputFilePath,outputfile);
 
 	if((outputFile = fopen(outputfile, "w")) == NULL){
 		fprintf(stderr,"Error opening %s\n",outputfile);
@@ -345,8 +345,11 @@ void handle_user_input(char *line, void *cbdata) {
   bzero(chunkf, sizeof(chunkf));
   bzero(outf, sizeof(outf));
 
+  printf("ready for sscanf!\n");
+
   if (sscanf(line, "GET %120s %120s", chunkf, outf)) {
     if (strlen(outf) > 0) {
+    	printf("going to process\n");
       process_get(chunkf, outf);
     }
   }

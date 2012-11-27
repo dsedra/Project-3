@@ -22,6 +22,7 @@ struct user_iobuf *create_userbuf() {
 void process_user_input(int fd, struct user_iobuf *userbuf, 
 			void (*handle_line)(char *, void *), void *cbdata)
 {
+  printf("made it in!\n");
   int nread;
   char *ret;
 
@@ -43,13 +44,18 @@ void process_user_input(int fd, struct user_iobuf *userbuf,
     userbuf->cur += nread;
   }
 
+  printf("before while loop\n");
+
  while ((ret = strchr(userbuf->buf, '\n')) != NULL) {
+  printf("starting while\n");
   *ret = '\0';
   handle_line(userbuf->buf, cbdata);
   /* Shift the remaining contents of the buffer forward */
   memmove(userbuf->buf, ret + 1, USERBUF_SIZE - (ret - userbuf->buf));
   userbuf->cur -= (ret - userbuf->buf + 1);
+  printf("stuck!!!\n");
  }
 
+ printf("returning\n");
 return;
 }
