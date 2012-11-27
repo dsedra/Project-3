@@ -20,6 +20,7 @@ chunkEle* initChunkEle(unsigned int id, char hash[sizeofHash]){
 	ele->bytesRead = 0;
 	ele->inProgress = 0;
 	ele->lastAckedCount = 0;
+	ele->fromThisPeer = NULL;
 	return ele;
 }
 
@@ -367,7 +368,11 @@ void findMex(chunkEle* cep){
 
 void cleanChunk(chunkEle* chunk){
 	close(chunk->masterfp);
-
+	
+	if(chunk->fromThisPeer != NULL){
+		chunk->fromThisPeer->inUse = 0;
+	}
+	
 	while(chunk->packetList.headp != NULL){
 		node* temp = chunk->packetList.headp;
 		remList(chunk->packetList.headp, &(chunk->packetList));
@@ -379,7 +384,7 @@ void cleanChunk(chunkEle* chunk){
 void cleanChunkList(linkedList* clp){
 	while(clp->headp != NULL){
 		node* temp = clp->headp;
-		cleanChunk((chunkEle*)(clp->headp));
+		cleanChunk((chunkEle*)temp->data);
 		remList(clp->headp, clp);
 		free(temp);
 	}

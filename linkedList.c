@@ -40,6 +40,7 @@ void remList(node* toRem, linkedList* listp){
 				listp->headp = toRem->nextp;
 
 			listp->length--;
+			break;
 		}
 		
 		itr = itr->nextp;

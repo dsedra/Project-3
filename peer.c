@@ -216,9 +216,6 @@ void process_inbound_udp(int sock) {
 		if ( cep->inProgress == 0){
 			break;
 		}
-
-
-
 		//check which wether SLOWSTART or CONGAVOID
 		if(cep->mode == SLOWSTART){
 			cep->windowSize++;
@@ -226,8 +223,6 @@ void process_inbound_udp(int sock) {
 		}
 		else
 			printf("@@@@in cong avoid rtt: %f\n",cep->fromThisPeer->rtt);
-
-
 		//check if enough to enter cong avoid
 		if(cep->windowSize == cep->ssthresh)
 			cep->mode = CONGAVOID;
@@ -293,7 +288,7 @@ void process_inbound_udp(int sock) {
 	}
 	case DENIED:{
 		printf("Received a denied ack!\n");
-
+		fclose(outputFile);
 		break;
 	}
 
@@ -310,7 +305,7 @@ void process_get(char *chunkfile, char *outputfile) {
 	parseChunkFile(chunkfile, &chunkList);
 	printChunkList(chunkList);
 	
-	strcpy(outputFilePath,outputfile,strlen(outputfile));
+	strcpy(outputFilePath,outputfile);
 
 	if((outputFile = fopen(outputfile, "w")) == NULL){
 		fprintf(stderr,"Error opening %s\n",outputfile);
@@ -403,7 +398,7 @@ void peer_run(bt_config_t *config) {
       }
       
       if (FD_ISSET(STDIN_FILENO, &readfds)) {
-		printf("going to process_user_input\n");
+		//printf("going to process_user_input\n");
 		process_user_input(STDIN_FILENO, userbuf, handle_user_input,
 			   "Currently unused");
       }
