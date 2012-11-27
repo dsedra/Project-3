@@ -38,6 +38,7 @@ linkedList peerList;
 linkedList haschunkList;
 linkedList windowSets;
 char masterDataFilePath[100];
+char outputFilePath[100];
 FILE* outputFile;
 time_t start;
 int maxCon;
@@ -142,9 +143,10 @@ void process_inbound_udp(int sock) {
 		printf("packet length is %u\n", pHead->packLen);
 		
 		//check for free connections
-		printf("maxcon:%d id: %d numout: %d\n",maxCon,peer->id,peer->numOut);
+		printf("maxcon:%d id: %d numout: %d\n",maxCon,mePeer->id,mePeer->numOut);
 		if(mePeer->numOut == maxCon){
-			void* deniedp = deniedCons();
+			chunkEle* dcp = lookupChunkHash((buf+20),&haschunkList);
+			void* deniedp = deniedCons(dcp->chunkId);
 			spiffy_sendto(sock, deniedp, headerSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
 			//sendto(sock, deniedp, headerSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
 			break;
@@ -190,6 +192,7 @@ void process_inbound_udp(int sock) {
 			chunkList.finished ++;
 			cep->fromThisPeer->inUse = 0;
 			cep->inProgress = 0;
+			mePeer->numOut--;
 			}
 			printf("FINISHED %d\n", chunkList.finished);
 			if(chunkList.finished == chunkList.length){
@@ -197,7 +200,7 @@ void process_inbound_udp(int sock) {
 				// merge the chunks and write to the corresponding output file
 				buildOuputFile(outputFile, &chunkList);
 				fclose(outputFile);
-				printf("GOT output file\n");
+				printf("GOT %s\n",outputFilePath);
 			}else{
 				// try to send rest of pending get requests 
 				// they are deferred to make sure no concurrent downloading from the same peer
@@ -213,6 +216,7 @@ void process_inbound_udp(int sock) {
 		if ( cep->inProgress == 0){
 			break;
 		}
+
 
 
 		//check which wether SLOWSTART or CONGAVOID
@@ -243,9 +247,12 @@ void process_inbound_udp(int sock) {
 			printf("Incrementing last ack counter for %d to %d\n", ((packetHead* )(buf))->ackNum,cep->lastAckedCount);
 			if( cep->lastAckedCount  == 3 ){
 				//cut ssthresh in half and set window 1
-				cep->ssthresh = halve(cep->ssthresh);
+				cep->ssthresh = halve(cep->windowSize);
 				cep->windowSize = 1;
 				cep->mode = SLOWSTART;
+
+				//reset this ones time
+				time(&cep->afterLastAckedTime);
 
 				//try retrasmit
 				cep->lastAckedCount = 0;
@@ -268,6 +275,7 @@ void process_inbound_udp(int sock) {
 				// some clear below
 				printf("All sent packets have been acked\n");
 				cep->inProgress = 0;
+				mePeer->numOut--;
 			}else{
 				printf("lastAcked:%d, lastSent:%d\n",((packetHead*)cep->lastAcked->data)->seqNum, ((packetHead*)cep->lastSent->data)->seqNum );
 			}
@@ -279,10 +287,13 @@ void process_inbound_udp(int sock) {
 		}
 
 		printPacketList(cep->packetList);
+		printf("window: %d, ssthresh: %d, mode: %d\n",cep->windowSize, cep->ssthresh,
+			cep->mode);
 		break;
 	}
 	case DENIED:{
 		printf("Received a denied ack!\n");
+
 		break;
 	}
 
@@ -299,6 +310,8 @@ void process_get(char *chunkfile, char *outputfile) {
 	parseChunkFile(chunkfile, &chunkList);
 	printChunkList(chunkList);
 	
+	strcpy(outputFilePath,outputfile,strlen(outputfile));
+
 	if((outputFile = fopen(outputfile, "w")) == NULL){
 		fprintf(stderr,"Error opening %s\n",outputfile);
 		exit(1);
@@ -459,8 +472,11 @@ void cleanList(chunkEle* cep){
 	while(cep->packetList.length > 0){
 		if(itr == cep->lastAcked)
 			return;
+		node* temp = itr;
 		remList(itr, &cep->packetList);
+		free(itr->data);
 		itr = itr->prevp;
+		free(temp);
 	}
 
 	return;
@@ -512,6 +528,7 @@ void sendWindow(chunkEle* cep, int sock){
 
 
 void parseChunkFile(char* chunkfile, linkedList* list){
+	cleanChunkList(list);
 	FILE* fp;
 	char locBuf[100];
 	unsigned int id;
@@ -569,7 +586,7 @@ void alarmHandler(int sig){
 			time(&cep->afterLastAckedTime);
 
 			//cut ssthresh in half and set window 1
-			cep->ssthresh = halve(cep->ssthresh);
+			cep->ssthresh = halve(cep->windowSize);
 			cep->windowSize = 1;
 			cep->mode = SLOWSTART;
 		}
@@ -605,7 +622,7 @@ void sendAfterLastAcked(chunkEle* cep){
 	do{
 		void* packet = cur->data;
 		unsigned int bufSize = ((packetHead *)packet)->packLen;
-		printf("***Timeout, retrans packet %d\n to peer %d***\n", ((packetHead* )packet)->seqNum, cep->fromThisPeer->id );
+		//printf("***Timeout, retrans packet %d\n to peer %d***\n", ((packetHead* )packet)->seqNum, cep->fromThisPeer->id );
 		spiffy_sendto(sock, packet, bufSize, 0, (struct sockaddr *) &cep->fromThisPeer->cli_addr, sizeof(cep->fromThisPeer->cli_addr));
 		//sendto(sock, ihavep, bufSize, 0, (struct sockaddr *) &from, fromlen);
 		cur = cur->prevp;

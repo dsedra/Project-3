@@ -76,11 +76,12 @@ void* ihaveCons(char* buf, linkedList* chunkList){
 	return packet;
 }
 
-void* deniedCons(){
+void* deniedCons(int chunkId){
 	void* packet = malloc( headerSize );
 	packetHead* pHp = (packetHead*) packet;
 
 	pHp->type = DENIED;
+	pHp->ackNum = chunkId;//reuse fields
 
 	return packet;
 }

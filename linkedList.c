@@ -38,8 +38,7 @@ void remList(node* toRem, linkedList* listp){
 				listp->headp = NULL;
 			else if(toRem == listp->headp)
 				listp->headp = toRem->nextp;
-		
-			free(toRem->data);
+
 			listp->length--;
 		}
 		

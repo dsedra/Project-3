@@ -94,6 +94,7 @@ int compareChunkHash(char hash1[sizeofHash], char hash2[sizeofHash]){
 
 chunkEle* lookupChunkHash(char target[sizeofHash], linkedList* cList){
 	node* itr = cList->headp;
+
 	do{
 		chunkEle* itrChunk = (chunkEle*)(itr->data);
 		if( compareChunkHash(target, itrChunk->chunkHash) ){
@@ -101,6 +102,18 @@ chunkEle* lookupChunkHash(char target[sizeofHash], linkedList* cList){
 		}
 		itr = itr->nextp;	
 	}while( itr != cList->headp );
+	return NULL;
+}
+
+node* lookupChunkID(int chunkId, linkedList* clist){
+	node* itr = clist->headp;
+	do{
+		chunkEle* itrChunk = (chunkEle*)(itr->data);
+		if( itrChunk->chunkId == chunkId ){
+			return itr;
+		}
+		itr = itr->nextp;	
+	}while( itr != clist->headp );
 	return NULL;
 }
 
@@ -348,6 +361,28 @@ void findMex(chunkEle* cep){
 		prevp = curp;
 		curp = curp->nextp;
 	}while(curp != cep->packetList.headp->nextp);
+
+	return;
+}
+
+void cleanChunk(chunkEle* chunk){
+	close(chunk->masterfp);
+
+	while(chunk->packetList.headp != NULL){
+		node* temp = chunk->packetList.headp;
+		remList(chunk->packetList.headp, &(chunk->packetList));
+		free(temp->data);
+		free(temp);
+	}
+}
+
+void cleanChunkList(linkedList* clp){
+	while(clp->headp != NULL){
+		node* temp = clp->headp;
+		cleanChunk((chunkEle*)(clp->headp));
+		remList(clp->headp, clp);
+		free(temp);
+	}
 
 	return;
 }

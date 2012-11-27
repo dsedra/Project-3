@@ -47,5 +47,8 @@ chunkEle* resolveChunk(peerEle* peerp, linkedList list);
 node* resolveLastPacketAcked(unsigned int target, chunkEle* cep);
 void sendPendingGetRequest(linkedList* chunkList, int sock);
 int writeChunkToFile(FILE* outfile, linkedList* packetList);
+void cleanChunk(chunkEle* chunk);
 int buildOuputFile(FILE* outfile, linkedList* chunkList);
 void findMex(chunkEle* cep);
+void cleanChunkList(linkedList* clp);
+node* lookupChunkID(int chunkId, linkedList* clist);
