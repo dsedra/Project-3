@@ -40,10 +40,12 @@ linkedList windowSets;
 char masterDataFilePath[100];
 FILE* outputFile;
 time_t start;
+int maxCon;
 
 /* global udp socket */
 int sock;
 int myId;
+peerEle* mePeer;
 void peer_run(bt_config_t *config);
 void parsePeerFile(char* peerFile);
 void parseChunkFile(char* chunkfile, linkedList* list);
@@ -138,25 +140,22 @@ void process_inbound_udp(int sock) {
 	case GET:{
 		printf("Receive GET Request\n");
 		printf("packet length is %u\n", pHead->packLen);
-		//need to resolve peer 
 		
+		//check for free connections
+		printf("maxcon:%d id: %d numout: %d\n",maxCon,peer->id,peer->numOut);
+		if(mePeer->numOut == maxCon){
+			void* deniedp = deniedCons();
+			spiffy_sendto(sock, deniedp, headerSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
+			//sendto(sock, deniedp, headerSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
+			break;
+		}
+		
+
 		chunkEle* thisWindow = buildNewWindow(&windowSets, &haschunkList, peer, masterDataFilePath, buf);
-		// here we try to send the full window of packets out
-		//int i;
-		//node* curr = thisWindow->packetList.headp->prevp;
-		//node* curr = thisWindow->packetList.headp;
-		//for( i = 0 ; i < thisWindow->windowSize ; i++){
-		//	void* packet = curr->data;
-		//	unsigned int bufSize = ((packetHead *)packet)->packLen;
-		//	spiffy_sendto(sock, packet, bufSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
-			//sendto(sock, packet, bufSize, 0, (struct sockaddr *) &peer->cli_addr, sizeof(peer->cli_addr));
-		//	thisWindow->lastSent = curr; 
-		//	curr = curr->prevp;
-			//curr = curr->nextp;
 
 		// send first element, no need to clean or fill
 		sendWindow(thisWindow, sock);
-
+		mePeer->numOut++;//increase num
 		break;
 	}
 	case DATA:{
@@ -164,13 +163,15 @@ void process_inbound_udp(int sock) {
 		void* newBuf = malloc(bufSize);
 		memcpy(newBuf,buf,bufSize);
 		chunkEle* cep = resolveChunk(peer, chunkList);
-		orderedAdd(cep,newBuf);
+		
 
 		// reject packets from finished chunk
 		if(cep && (cep->chunkId != ((packetHead*)buf)->ackNum)){
 			printf("Wrong chunk!\n");
 			break;
 		}
+
+		orderedAdd(cep,newBuf);
 
 		printf("Receive data packet %d, with size %d \n", ((packetHead *)buf)->seqNum, ((packetHead *)buf)->packLen - headerSize);
 
@@ -208,14 +209,33 @@ void process_inbound_udp(int sock) {
 	}
 	case ACK:{
 		chunkEle* cep = resolveChunk(peer, windowSets);
+
 		if ( cep->inProgress == 0){
 			break;
 		}
 
 
 		//check which wether SLOWSTART or CONGAVOID
-		if(cep->mode == SLOWSTART)
+		if(cep->mode == SLOWSTART){
 			cep->windowSize++;
+			printf("####in slow start\n");
+		}
+		else
+			printf("@@@@in cong avoid rtt: %f\n",cep->fromThisPeer->rtt);
+
+
+		//check if enough to enter cong avoid
+		if(cep->windowSize == cep->ssthresh)
+			cep->mode = CONGAVOID;
+
+		//check for no ack in rtt
+		if((cep->mode == CONGAVOID) && (cep->haveACK == 0)){
+			cep->windowSize++;
+			printf("IIIIincreasing in cong avoid\n");
+		}
+
+		//set ack
+		cep->haveACK = 1;
 
 		printf("Receive Ack %d\n", *(int*)(buf+12));
 		if( (cep->lastAcked) && ((packetHead* )(cep->lastAcked->data))->seqNum == ((packetHead* )(buf))->ackNum ){
@@ -225,6 +245,7 @@ void process_inbound_udp(int sock) {
 				//cut ssthresh in half and set window 1
 				cep->ssthresh = halve(cep->ssthresh);
 				cep->windowSize = 1;
+				cep->mode = SLOWSTART;
 
 				//try retrasmit
 				cep->lastAckedCount = 0;
@@ -260,9 +281,13 @@ void process_inbound_udp(int sock) {
 		printPacketList(cep->packetList);
 		break;
 	}
-	
-	
+	case DENIED:{
+		printf("Received a denied ack!\n");
+		break;
 	}
+
+	}
+
   printf("PROCESS_INBOUND_UDP SKELETON -- replace!\n"
 	 "Incoming message from %s:%d\n%s\n\n", 
 	 inet_ntoa(from.sin_addr),
@@ -328,7 +353,8 @@ void peer_run(bt_config_t *config) {
   parseMasterChunkFile(config->chunk_file);		
   printf("The master data file name: %s\n", masterDataFilePath);
 	
-	
+  maxCon = config->max_conn;// rename max connections
+
   if ((userbuf = create_userbuf()) == NULL) {
     perror("peer_run could not allocate userbuf");
     exit(-1);
@@ -403,13 +429,19 @@ void parsePeerFile(char* peerFile){
 	   	ele->cli_addr.sin_family = AF_INET;
 		ele->cli_addr.sin_addr.s_addr = *(in_addr_t *)h->h_addr;
   		ele->cli_addr.sin_port = htons(port);
-		
+		ele->numOut = 0;
+		ele->numIn = 0;
 		
 		memcpy(ele->host, hostname, strlen(hostname));
 		ele->port = port;
 		ele->inUse = 0;
 		
 		node* newNode = initNode(ele);
+
+		//a pointer to myslef in peer list
+		if(ele->id == myId)
+			mePeer = ele;
+
 		addList(newNode, &peerList);
 	}
 	fclose(fp);
@@ -539,6 +571,14 @@ void alarmHandler(int sig){
 			//cut ssthresh in half and set window 1
 			cep->ssthresh = halve(cep->ssthresh);
 			cep->windowSize = 1;
+			cep->mode = SLOWSTART;
+		}
+
+		//reset rtt timer
+		dif = difftime(curTime,cep->rttCounter);
+		if(dif >= cep->fromThisPeer->rtt){
+			cep->haveACK = 0;
+			cep->rttCounter = curTime;
 		}
 	}
 		curWindow = curWindow->prevp;

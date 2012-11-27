@@ -76,6 +76,15 @@ void* ihaveCons(char* buf, linkedList* chunkList){
 	return packet;
 }
 
+void* deniedCons(){
+	void* packet = malloc( headerSize );
+	packetHead* pHp = (packetHead*) packet;
+
+	pHp->type = DENIED;
+
+	return packet;
+}
+
 void* getCons(char hash[sizeofHash]){
 	void* packet = malloc( sizeofGetPacket); /* fixed and known */
 	packetHead* pHp = (packetHead*) packet;

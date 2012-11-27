@@ -16,6 +16,8 @@ typedef struct cE{
 	int windowSize;
 	int lastAckedCount;
 	time_t afterLastAckedTime; // last time that lasted
+	time_t rttCounter;
+	int haveACK;// have we gotten an ack in this rtt?
 	int mode;
 	int ssthresh;
 

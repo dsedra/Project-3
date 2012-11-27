@@ -294,6 +294,8 @@ chunkEle* buildNewWindow(linkedList* windowSets, linkedList* hasChunkList, peerE
 	thisWindow->lastAcked = NULL;
 	thisWindow->mode = SLOWSTART;
 	thisWindow->ssthresh = 64;
+	thisWindow->haveACK = 0;
+	time(&thisWindow->rttCounter);
 	time(&thisWindow->afterLastAckedTime);
 
 	thisWindow->inProgress = 1;

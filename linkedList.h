@@ -36,6 +36,8 @@ typedef struct ps{
 	int port;
 	struct sockaddr_in cli_addr;
 	int inUse;
+	int numIn;
+	int numOut;
 	double rtt;
 }peerEle;
 
