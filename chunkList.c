@@ -165,6 +165,9 @@ void sendPendingGetRequest(linkedList* chunkList, int sock){
 	for(i = 0 ; i < chunkList->length; i ++){
 		chunkEle*  thisELe = (chunkEle* )itr->data;
 		
+
+		printf("fromThisPeer: %d, inUse: %d, bytesRead: %d\n",(thisELe->fromThisPeer==NULL),thisELe->fromThisPeer->inUse,
+			thisELe->bytesRead);
 		if((thisELe->fromThisPeer) && (thisELe->fromThisPeer->inUse == 0) && (thisELe->bytesRead == 0)){
 			thisELe->fromThisPeer->inUse = 1; 
 			thisELe->inProgress = 1;

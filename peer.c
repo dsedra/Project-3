@@ -41,6 +41,7 @@ char masterDataFilePath[100];
 char outputFilePath[100];
 FILE* outputFile;
 time_t start;
+time_t getRetryTimer;
 int maxCon;
 
 /* global udp socket */
@@ -166,6 +167,7 @@ void process_inbound_udp(int sock) {
 		memcpy(newBuf,buf,bufSize);
 		chunkEle* cep = resolveChunk(peer, chunkList);
 		
+		getRetryTimer = 0;
 
 		// reject packets from finished chunk
 		if(cep && (cep->chunkId != ((packetHead*)buf)->ackNum)){
@@ -288,7 +290,10 @@ void process_inbound_udp(int sock) {
 	}
 	case DENIED:{
 		printf("Received a denied ack!\n");
-		fclose(outputFile);
+		chunkEle* cep = resolveChunk(peer, chunkList);
+		//fclose(outputFile);
+		time(&getRetryTimer);
+		cep->fromThisPeer->inUse = 0;
 		break;
 	}
 
@@ -365,6 +370,7 @@ void peer_run(bt_config_t *config) {
   printf("The master data file name: %s\n", masterDataFilePath);
 	
   maxCon = config->max_conn;// rename max connections
+  getRetryTimer = 0;
 
   if ((userbuf = create_userbuf()) == NULL) {
     perror("peer_run could not allocate userbuf");
@@ -602,6 +608,14 @@ void alarmHandler(int sig){
    	setitimer(ITIMER_REAL, &tout_val,0);
  	setitimer(ITIMER_REAL, &tout_val,0);
 
+ 	time(&curTime);
+ 	dif = difftime(curTime, getRetryTimer);
+
+ 	if((getRetryTimer != 0) && (dif >= (double)20.0)){
+ 		printf("20 timer went off!\n");
+ 		sendPendingGetRequest(&chunkList, sock);
+ 		time(&getRetryTimer);
+ 	}
  	return;
 }
 
